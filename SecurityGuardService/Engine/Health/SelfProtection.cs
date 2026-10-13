@@ -4,10 +4,12 @@ using System.ComponentModel;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Security.AccessControl;
 using System.Security.Principal;
 using System.Threading;
+using Microsoft.Win32;
 using SecurityGuard.Shared;
 using SecurityGuardService.Core;
 using SecurityGuardService.Core.Data;
@@ -53,6 +55,7 @@ namespace SecurityGuardService.Engine.Health
         private readonly object _lock = new object();
         private readonly Dictionary<string, bool> _protected = new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
         private bool? _serviceProtected;
+        private bool? _regProtected; // servis registry anahtarı (Start / ImagePath) ilk kez tutarlı görüldü mü
         private string _appliedDacl; // Windows'un geri okuduğu hali (biçim farkı yanlış alarm üretmesin)
         private string _lastBackupFolder;
         private readonly HashSet<string> _failedFolders = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -111,6 +114,7 @@ namespace SecurityGuardService.Engine.Health
                     return;
                 }
                 Safe(status, "Servis izinleri", ServiceDacl);
+                Safe(status, "Servis kaydı", ServiceRegistry);
                 Safe(status, "Veri klasörleri", () => DataFolders().Select(f => FolderAcl(f, GeneralSettings.GetBool(_settings, SettingKeys.ProtectData), "veri klasörü")).ToList().All(x => x) ? "korunuyor" : null);
                 Safe(status, "Yedek klasörü", BackupAcl);
                 Status = string.Join("; ", status) + ".";
@@ -175,6 +179,52 @@ namespace SecurityGuardService.Engine.Health
                 return new HashSet<string>(dacl.Split(new[] { '(', ')' }, StringSplitOptions.RemoveEmptyEntries).Select(x => x.Trim()).Where(x => x.Length > 0), StringComparer.OrdinalIgnoreCase);
             };
             return aces(a).SetEquals(aces(b));
+        }
+
+        // ================================================================ Servis registry (Start / ImagePath)
+
+        /// <summary>
+        /// Servisin kayıt defteri anahtarını (HKLM\...\Services\&lt;ad&gt;) korur: Start devre dışı yapılır ya da ImagePath
+        /// başka bir exe'ye çevrilirse (servisi açılışta engelleme / yerine kendi programını SYSTEM olarak çalıştırma)
+        /// eski haline yazılır ve "Guard.ServiceTamper" olayı üretilir. DACL koruması SCM işlemlerini kısar ama kayıt
+        /// defterini DOĞRUDAN düzenlemeyi kapsamaz; bu kontrol o açığı kapatır.
+        /// </summary>
+        private string ServiceRegistry()
+        {
+            if (!_isService) return "konsol modu (uygulanmaz)";
+            if (!GeneralSettings.GetBool(_settings, SettingKeys.ProtectService)) { _regProtected = null; return null; }
+
+            string exe = Assembly.GetExecutingAssembly().Location;
+            using (var hklm = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64))
+            using (var key = hklm.OpenSubKey(@"SYSTEM\CurrentControlSet\Services\" + GuardConstants.ServiceName, writable: true))
+            {
+                if (key == null) return "kayıt bulunamadı";
+                int start = 2;
+                try { start = Convert.ToInt32(key.GetValue("Start", 2)); } catch { }
+                string imagePath = (key.GetValue("ImagePath", "", RegistryValueOptions.DoNotExpandEnvironmentNames) as string) ?? "";
+
+                bool startOk = start == 2; // 2 = Otomatik (installer böyle kurar); 4 = Devre dışı, 3 = Manuel -> açılışta başlamaz
+                bool imageOk = imagePath.IndexOf(exe, StringComparison.OrdinalIgnoreCase) >= 0;
+                if (startOk && imageOk) { _regProtected = true; return null; }
+
+                try
+                {
+                    if (!startOk) key.SetValue("Start", 2, RegistryValueKind.DWord);
+                    if (!imageOk) key.SetValue("ImagePath", "\"" + exe + "\"", RegistryValueKind.ExpandString);
+                }
+                catch (Exception ex)
+                {
+                    AppLog.Warn(Module, "Servis kaydı geri yazılamadı: " + ex.Message);
+                }
+
+                if (_regProtected == true)
+                    _events.Record(new GuardEvent("Guard.ServiceTamper", "SecurityGuard servisinin kayıt defteri ayarı dışarıdan değiştirildi; geri yazıldı.") { Source = "Servis koruması" }
+                        .With("Bulunan Start", start == 4 ? "4 (Devre dışı)" : start == 3 ? "3 (Manuel)" : start.ToString())
+                        .With("Bulunan ImagePath", imagePath)
+                        .With("Not", "Biri servisi açılışta engellemek (Start değiştirme) ya da ImagePath'i değiştirip yerine başka bir programı SYSTEM yetkisiyle çalıştırmak için kayıt defterini düzenlemiş. Bunu siz yapmadıysanız sunucuda yetkisiz yönetici olabilir."));
+                _regProtected = true;
+                return "kayıt geri yazıldı";
+            }
         }
 
         // ================================================================ Klasör izinleri
