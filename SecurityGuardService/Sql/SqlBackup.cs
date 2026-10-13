@@ -617,8 +617,9 @@ WHERE b.type = 'D' AND b.is_copy_only = 0 AND ISNULL(b.name, '') <> N'SecurityGu
                     // 3) Şifreli arşiv + test
                     _owner.SetProgress(_instance + " / " + db + ": şifreli arşivleniyor");
                     sw.Restart();
-                    RunRar("a -ep -ma5 -m1 -y -idq \"-hp" + _password + "\" \"" + archive + "\" \"" + bak + "\"", TimeSpan.FromHours(6));
-                    RunRar("t -y -idq \"-hp" + _password + "\" \"" + archive + "\"", TimeSpan.FromHours(3));
+                    // Şifre komut satırında DEĞİL: "-hp" (değersiz) ile Rar.exe şifreyi stdin'den okur (RunRar yazar).
+                    RunRar("a -ep -ma5 -m1 -y -idq -hp \"" + archive + "\" \"" + bak + "\"", TimeSpan.FromHours(6));
+                    RunRar("t -y -idq -hp \"" + archive + "\"", TimeSpan.FromHours(3));
                     double archiveMb = new FileInfo(archive).Length / 1024.0 / 1024.0;
                     _totalMb += archiveMb;
                     _ok++;
@@ -658,18 +659,39 @@ WHERE b.type = 'D' AND b.is_copy_only = 0 AND ISNULL(b.name, '') <> N'SecurityGu
                 _token.ThrowIfCancellationRequested();
             }
 
-            /// <summary>Rar.exe çalıştırır. Komut satırı (şifre içerir) hiçbir yere loglanmaz.</summary>
+            /// <summary>
+            /// Rar.exe çalıştırır. Şifre komut satırında DEĞİL stdin'den verilir: "-hp" (değersiz) ile Rar.exe
+            /// şifreyi sorar, biz stdin'den yazarız. Böylece şifre 4688 / Sysmon / EDR komut satırı kayıtlarında görünmez
+            /// ve şifre '\' ile bitse bile argüman ayrımı bozulmaz. Arşiv oluştururken bazı sürümler şifreyi iki kez
+            /// (onay) isteyebildiği için iki kez yazılır; fazlası okunmazsa zararsızdır.
+            /// </summary>
             private void RunRar(string args, TimeSpan timeout)
             {
                 var psi = new ProcessStartInfo(_rar, args)
                 {
                     UseShellExecute = false,
                     CreateNoWindow = true,
+                    RedirectStandardInput = true,
                     RedirectStandardOutput = true,
                     RedirectStandardError = true
                 };
                 using (var p = Process.Start(psi))
                 {
+                    try
+                    {
+                        p.StandardInput.WriteLine(_password);
+                        p.StandardInput.WriteLine(_password);
+                        p.StandardInput.Flush();
+                    }
+                    catch (IOException)
+                    {
+                        // Rar şifreyi okuyup stdin'i kapatmış olabilir; sorun değil
+                    }
+                    finally
+                    {
+                        try { p.StandardInput.Close(); } catch { }
+                    }
+
                     var output = p.StandardOutput.ReadToEndAsync();
                     var error = p.StandardError.ReadToEndAsync();
                     var deadline = DateTime.UtcNow + timeout;

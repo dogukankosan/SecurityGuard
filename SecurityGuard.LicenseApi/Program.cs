@@ -51,6 +51,7 @@ builder.Services.ConfigureHttpJsonOptions(o => o.SerializerOptions.PropertyNamin
 builder.Services.AddSingleton<LicenseRepository>();
 builder.Services.AddSingleton(sp => new Signing(KeyFilePath(sp.GetRequiredService<IConfiguration>())));
 builder.Services.AddSingleton<AdminKey>();
+builder.Services.AddSingleton<AdminAccess>();
 builder.Services.AddHostedService<PurgeService>();
 
 int validatePerMinute = builder.Configuration.GetValue("RateLimit:ValidatePerMinute", 30);
@@ -64,7 +65,8 @@ builder.Services.AddRateLimiter(o =>
         _ => new FixedWindowRateLimiterOptions { PermitLimit = adminPerMinute, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
 });
 
-bool swagger = builder.Configuration.GetValue("Swagger:Enabled", true);
+// Swagger varsayılan SADECE geliştirmede açık (üretimde kapalı: bilgi sızıntısı / saldırı yüzeyi). appsettings ile açıkça açılabilir.
+bool swagger = builder.Configuration.GetValue("Swagger:Enabled", builder.Environment.IsDevelopment());
 if (swagger)
 {
     builder.Services.AddEndpointsApiExplorer();
@@ -95,6 +97,11 @@ if (adminKeys.Invalid > 0)
     app.Logger.LogError("Admin:KeyHashes içinde {Count} hatalı değer yok sayıldı (64 karakter hex olmalı: --generate-admin-key çıktısındaki özet).", adminKeys.Invalid);
 if (adminKeys.Count == 0)
     app.Logger.LogWarning("Admin:KeyHashes boş: yönetici uçları kapalı (--generate-admin-key).");
+var adminAccess = app.Services.GetRequiredService<AdminAccess>();
+if (adminKeys.Count > 0 && !adminAccess.Restricted)
+    app.Logger.LogWarning("Admin:AllowedIps boş: yönetici uçlarına HER IP'den erişilebilir. Üretimde kendi yönetim IP'nizi ekleyin (örn. [\"203.0.113.10\", \"198.51.100.0/24\"]).");
+if (adminKeys.Count > 0 && !adminAccess.RequireHttps)
+    app.Logger.LogWarning("Admin:RequireHttps kapalı: yönetici anahtarı (X-Admin-Key) HTTP ile düz metin gidebilir. HTTPS kurup Admin:RequireHttps=true yapın.");
 
 app.UseRateLimiter();
 if (swagger)
@@ -259,16 +266,87 @@ public sealed class AdminKey
     }
 }
 
-public sealed class AdminKeyFilter(AdminKey keys, ILogger<AdminKeyFilter> log) : IEndpointFilter
+public sealed class AdminKeyFilter(AdminKey keys, AdminAccess access, ILogger<AdminKeyFilter> log) : IEndpointFilter
 {
     public async ValueTask<object?> InvokeAsync(EndpointFilterInvocationContext ctx, EndpointFilterDelegate next)
     {
-        if (!keys.Check(ctx.HttpContext.Request.Headers[AdminKey.Header]))
+        var http = ctx.HttpContext;
+        var ip = http.Connection.RemoteIpAddress;
+
+        // 1) HTTPS zorunluysa düz HTTP reddedilir (yönetici anahtarı düz metin gitmesin)
+        if (access.RequireHttps && !http.Request.IsHttps)
         {
-            log.LogWarning("Hatalı yönetici anahtarı: {Ip} {Path}", ctx.HttpContext.Connection.RemoteIpAddress, ctx.HttpContext.Request.Path);
+            log.LogWarning("Yönetici ucu HTTPS dışından çağrıldı, reddedildi: {Ip} {Path}", ip, http.Request.Path);
+            return Results.StatusCode(StatusCodes.Status403Forbidden);
+        }
+        // 2) IP izin listesi (yapılandırıldıysa): dışarıdakine ucun varlığını bile belli etme
+        if (!access.IsAllowed(ip))
+        {
+            log.LogWarning("İzinli olmayan IP'den yönetici ucu denemesi: {Ip} {Path}", ip, http.Request.Path);
+            return Results.NotFound();
+        }
+        // 3) X-Admin-Key
+        if (!keys.Check(http.Request.Headers[AdminKey.Header]))
+        {
+            log.LogWarning("Hatalı yönetici anahtarı: {Ip} {Path}", ip, http.Request.Path);
             return Results.Unauthorized();
         }
         return await next(ctx);
+    }
+}
+
+/// <summary>
+/// Yönetici uçlarına erişim kısıtı: izinli IP'ler (exact veya CIDR) ve HTTPS zorunluluğu.
+/// Admin:AllowedIps boşsa herkese açık (açılışta uyarı). IPv4-mapped IPv6 adresler normalize edilir.
+/// </summary>
+public sealed class AdminAccess
+{
+    private readonly (byte[] Net, int Bits)[] _ranges;
+    public bool RequireHttps { get; }
+    public bool Restricted => _ranges.Length > 0;
+
+    public AdminAccess(IConfiguration config)
+    {
+        RequireHttps = config.GetValue("Admin:RequireHttps", false);
+        var list = new List<(byte[], int)>();
+        foreach (var raw in config.GetSection("Admin:AllowedIps").Get<string[]>() ?? [])
+        {
+            var s = raw?.Trim();
+            if (string.IsNullOrEmpty(s)) continue;
+            int bits = -1;
+            string ipPart = s;
+            int slash = s.IndexOf('/');
+            if (slash >= 0 && int.TryParse(s[(slash + 1)..], out int b)) { ipPart = s[..slash]; bits = b; }
+            if (!IPAddress.TryParse(ipPart, out var ip)) continue;
+            if (ip.IsIPv4MappedToIPv6) ip = ip.MapToIPv4();
+            var bytes = ip.GetAddressBytes();
+            if (bits < 0 || bits > bytes.Length * 8) bits = bytes.Length * 8; // exact
+            list.Add((bytes, bits));
+        }
+        _ranges = list.ToArray();
+    }
+
+    public bool IsAllowed(IPAddress? addr)
+    {
+        if (_ranges.Length == 0) return true;          // yapılandırılmadı: herkese açık (uyarı loglanır)
+        if (addr == null) return false;
+        if (addr.IsIPv4MappedToIPv6) addr = addr.MapToIPv4();
+        var ab = addr.GetAddressBytes();
+        foreach (var (net, bits) in _ranges)
+        {
+            if (net.Length != ab.Length) continue;     // IPv4/IPv6 uyuşmazlığı
+            if (PrefixMatch(ab, net, bits)) return true;
+        }
+        return false;
+    }
+
+    private static bool PrefixMatch(byte[] a, byte[] b, int bits)
+    {
+        int full = bits / 8, rem = bits % 8;
+        for (int i = 0; i < full; i++) if (a[i] != b[i]) return false;
+        if (rem == 0) return true;
+        int mask = (0xFF << (8 - rem)) & 0xFF;
+        return (a[full] & mask) == (b[full] & mask);
     }
 }
 
