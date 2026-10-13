@@ -54,7 +54,9 @@ Name: "desktopicon"; Description: "Masaüstü kısayolu oluştur"; GroupDescript
 ; Windows servisini kur + başlat (servis exe kendi --install --start komutuyla; kurtarma ayarları da burada yapılır).
 Filename: "{app}\Service\{#ServiceExe}"; Parameters: "--install --start"; StatusMsg: "SecurityGuard servisi kuruluyor ve başlatılıyor..."; Flags: runhidden waituntilterminated
 ; Kurulum sonrası arayüzü aç (ilk kurulum sihirbazı: SQL bağlantısı, mail, lisans).
-Filename: "{app}\UI\{#UiExe}"; Description: "SecurityGuard'ı aç ve kurulumu tamamla (SQL / mail / lisans)"; Flags: nowait postinstall skipifsilent
+; shellexec: UI yönetici yetkisi ister (manifest requireAdministrator). Düz CreateProcess bunu kaldıramaz (kod 740);
+; ShellExecute manifest'i dikkate alıp yükseltir (installer zaten admin olduğundan ekstra UAC çıkmaz).
+Filename: "{app}\UI\{#UiExe}"; Description: "SecurityGuard'ı aç ve kurulumu tamamla (SQL / mail / lisans)"; Flags: nowait postinstall skipifsilent shellexec
 
 [Code]
 const
