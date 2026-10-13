@@ -1,0 +1,241 @@
+{
+  "info": {
+    "_postman_id": "6d2f6f2e-5b7a-4c1e-9a43-8f0d3c1b7e21",
+    "name": "SecurityGuard Lisans API",
+    "description": "SecurityGuard lisans sunucusu.\n\nDeğişkenler (koleksiyon → Variables):\n- baseUrl: API adresi (sonunda / yok), ör. http://192.168.1.10:5080\n- adminKey: --generate-admin-key ile üretilen anahtar (özet değil, anahtarın kendisi). Paylaşılan ortamlara kaydetmeyin.\n- hwId: SecurityGuard → Lisans sayfasındaki donanım kimliği\n- customer, expiresUtc, note: yeni lisans bilgileri (expiresUtc boşsa 1 yıl sonrası atanır)\n- licenseId: 'Lisans oluştur' sonrası otomatik dolar\n\nYönetici klasöründeki istekler X-Admin-Key başlığını {{adminKey}} ile otomatik gönderir.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:5080" },
+    { "key": "adminKey", "value": "" },
+    { "key": "hwId", "value": "SG1-00000000-00000000-00000000-00000000" },
+    { "key": "customer", "value": "Test Müşteri" },
+    { "key": "expiresUtc", "value": "" },
+    { "key": "note", "value": "Postman ile oluşturuldu" },
+    { "key": "licenseId", "value": "" },
+    { "key": "search", "value": "" },
+    { "key": "nonce", "value": "" },
+    { "key": "clientTimeUtc", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Sağlık kontrolü",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/api/v1/health",
+        "description": "Status=ok olmalı. KeyMatches=true değilse SecurityGuard'a gömülü açık anahtar bu sunucunun anahtarıyla aynı değil: istemciler cevapları reddeder."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+              "const j = pm.response.json();",
+              "pm.test('Status ok', () => pm.expect(j.Status).to.eql('ok'));",
+              "pm.test('İmza anahtarı SecurityGuard ile eşleşiyor (KeyMatches)', () => pm.expect(j.KeyMatches).to.eql(true));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "İstemci",
+      "item": [
+        {
+          "name": "Lisans doğrula (servisin yaptığı çağrı)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Her istekte yeni nonce ve saat (servis de böyle yapar)",
+                  "pm.collectionVariables.set('nonce', CryptoJS.enc.Base64.stringify(CryptoJS.lib.WordArray.random(16)));",
+                  "pm.collectionVariables.set('clientTimeUtc', new Date().toISOString().replace(/\\.\\d{3}Z$/, 'Z'));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "const j = pm.response.json();",
+                  "pm.test('Nonce geri geldi', () => pm.expect(j.Nonce).to.eql(pm.collectionVariables.get('nonce')));",
+                  "pm.test('HWID geri geldi', () => pm.expect(j.HwId).to.eql(pm.collectionVariables.get('hwId')));",
+                  "pm.test('İmzalı', () => pm.expect(j.Signature).to.be.a('string').and.not.empty);",
+                  "console.log('Durum: ' + j.Status + ', müşteri: ' + j.Customer + ', bitiş: ' + j.ExpiresUtc + ', eşleşen parça: ' + j.Matched);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"HwId\": \"{{hwId}}\",\n  \"Nonce\": \"{{nonce}}\",\n  \"ClientTimeUtc\": \"{{clientTimeUtc}}\",\n  \"Version\": \"postman\",\n  \"MachineName\": \"POSTMAN\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/license/validate",
+            "description": "Status: valid / expired / revoked / unknown. Cevap RSA ile imzalıdır. IP başına dakikada 30 istek sınırı vardır (aşılırsa 429). Not: lisanssız HWID ile yapılan her çağrı 'lisanssız makineler' listesine düşer."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Yönetici",
+      "auth": {
+        "type": "apikey",
+        "apikey": [
+          { "key": "key", "value": "X-Admin-Key", "type": "string" },
+          { "key": "value", "value": "{{adminKey}}", "type": "string" },
+          { "key": "in", "value": "header", "type": "string" }
+        ]
+      },
+      "item": [
+        {
+          "name": "Lisansları listele",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/licenses?search={{search}}&top=500",
+              "host": [ "{{baseUrl}}" ],
+              "path": [ "api", "v1", "admin", "licenses" ],
+              "query": [
+                { "key": "search", "value": "{{search}}", "description": "Müşteri adı, HWID veya makine adı (boş = hepsi)" },
+                { "key": "top", "value": "500" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Lisans oluştur",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Bitiş boşsa 1 yıl sonrası (UTC gece yarısı)",
+                  "if (!pm.collectionVariables.get('expiresUtc')) {",
+                  "  const d = new Date(); d.setUTCFullYear(d.getUTCFullYear() + 1); d.setUTCHours(0, 0, 0, 0);",
+                  "  pm.variables.set('expiresUtc', d.toISOString().replace(/\\.\\d{3}Z$/, 'Z'));",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 201', () => pm.response.to.have.status(201));",
+                  "if (pm.response.code === 201) {",
+                  "  const j = pm.response.json();",
+                  "  pm.collectionVariables.set('licenseId', j.LicenseId);",
+                  "  console.log('Lisans no: ' + j.LicenseId + ' (licenseId değişkenine yazıldı)');",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"HwId\": \"{{hwId}}\",\n  \"Customer\": \"{{customer}}\",\n  \"ExpiresUtc\": \"{{expiresUtc}}\",\n  \"Note\": \"{{note}}\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/admin/licenses",
+            "description": "Aynı makinede zaten aktif lisans varsa 409 döner (önce eskisini iptal edin veya süresini uzatın)."
+          }
+        },
+        {
+          "name": "Lisans getir",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/admin/licenses/{{licenseId}}"
+          }
+        },
+        {
+          "name": "Süre uzat / güncelle",
+          "request": {
+            "method": "PUT",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ExpiresUtc\": \"2028-01-01T00:00:00Z\",\n  \"Customer\": null,\n  \"Note\": null\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/admin/licenses/{{licenseId}}",
+            "description": "null bırakılan alanlar değişmez."
+          }
+        },
+        {
+          "name": "İptal et",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/admin/licenses/{{licenseId}}/revoke",
+            "description": "İstemci en geç 5 dakikada korumayı durdurur."
+          }
+        },
+        {
+          "name": "Geri aç",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/admin/licenses/{{licenseId}}/restore"
+          }
+        },
+        {
+          "name": "Doğrulama geçmişi",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/licenses/{{licenseId}}/checks?top=50",
+              "host": [ "{{baseUrl}}" ],
+              "path": [ "api", "v1", "admin", "licenses", "{{licenseId}}", "checks" ],
+              "query": [ { "key": "top", "value": "50" } ]
+            },
+            "description": "Result: 1 geçerli, 2 süresi dolmuş, 3 iptal, 4 bilinmeyen. Matched: eşleşen HWID parçası (4 tam, 3 donanım değişmiş)."
+          }
+        },
+        {
+          "name": "Lisanssız makineler",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/unknown-machines?days=7",
+              "host": [ "{{baseUrl}}" ],
+              "path": [ "api", "v1", "admin", "unknown-machines" ],
+              "query": [ { "key": "days", "value": "7" } ]
+            },
+            "description": "SecurityGuard kurulu ama lisansı olmayan makineler: yeni kurulumların HWID'si buradan alınabilir."
+          }
+        },
+        {
+          "name": "Eski doğrulama kayıtlarını sil",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/purge?keepDays=180",
+              "host": [ "{{baseUrl}}" ],
+              "path": [ "api", "v1", "admin", "purge" ],
+              "query": [ { "key": "keepDays", "value": "180" } ]
+            },
+            "description": "Servis bunu zaten günde bir yapar; elle gerekmez."
+          }
+        }
+      ]
+    }
+  ]
+}

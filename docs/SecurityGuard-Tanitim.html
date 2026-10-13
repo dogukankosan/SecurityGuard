@@ -1,0 +1,330 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SecurityGuard — Tanıtım ve Teknik Doküman</title>
+<style>
+  :root{
+    --navy:#0f2a47; --navy2:#143b61; --green:#1d9d6c; --green2:#5fd3a3;
+    --ink:#1f2b3a; --muted:#64748b; --line:#e3e8ef; --bg:#f6f8fb; --card:#ffffff;
+    --red:#c62828; --orange:#ef6c00;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:'Segoe UI',Roboto,Arial,Helvetica,sans-serif;line-height:1.6;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:980px;margin:0 auto;padding:0 20px}
+  a{color:var(--green)}
+  h2{font-size:24px;color:var(--navy);margin:0 0 4px}
+  h3{font-size:16px;color:var(--navy);margin:0 0 6px}
+  .sub{color:var(--muted);margin:0 0 22px}
+  section{padding:40px 0;border-bottom:1px solid var(--line)}
+  section:last-child{border-bottom:0}
+
+  /* Hero */
+  .hero{background:linear-gradient(135deg,#0f2a47 0%,#143b61 100%);color:#fff;padding:52px 0 46px}
+  .hero .wrap{display:flex;align-items:center;gap:22px;flex-wrap:wrap}
+  .badge{width:64px;height:64px;background:var(--green);border-radius:14px;display:flex;
+    align-items:center;justify-content:center;font-size:30px;font-weight:800;color:#fff;flex:0 0 auto}
+  .hero h1{font-size:34px;margin:0;letter-spacing:.3px}
+  .hero p{margin:6px 0 0;color:#aec3da;font-size:16px;max-width:620px}
+  .pill{display:inline-block;background:#143b61;color:var(--green2);font-size:12px;font-weight:600;
+    padding:6px 12px;border-radius:20px;margin-top:14px;border:1px solid #27527f}
+
+  /* Grid cards */
+  .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:16px}
+  @media(max-width:720px){.grid{grid-template-columns:1fr}.hero h1{font-size:27px}}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px 18px 16px}
+  .card .ic{width:38px;height:38px;border-radius:9px;background:#eaf6f0;display:flex;align-items:center;justify-content:center;margin-bottom:10px}
+  .card h3{margin-bottom:4px}
+  .card p{margin:0;color:var(--muted);font-size:13.5px}
+  .card ul{margin:8px 0 0;padding-left:18px;color:var(--muted);font-size:13px}
+  .card li{margin:2px 0}
+
+  /* Lead paragraph */
+  .lead{font-size:17px;color:#334155}
+  .kv{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:18px}
+  @media(max-width:720px){.kv{grid-template-columns:1fr 1fr}}
+  .kv div{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+  .kv b{display:block;font-size:20px;color:var(--navy)}
+  .kv span{font-size:12px;color:var(--muted)}
+
+  /* Architecture diagram */
+  .diagram{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px;overflow-x:auto}
+  .tech{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-top:16px}
+  @media(max-width:720px){.tech{grid-template-columns:1fr}}
+  .tech div{background:var(--card);border:1px solid var(--line);border-left:3px solid var(--green);
+    border-radius:8px;padding:10px 14px;font-size:13.5px}
+  .tech b{color:var(--navy)}
+
+  /* Screenshot placeholders */
+  .shots{display:grid;grid-template-columns:repeat(2,1fr);gap:16px}
+  @media(max-width:720px){.shots{grid-template-columns:1fr}}
+  .shot{border:2px dashed #c5d2e2;border-radius:12px;background:#eef3f9;min-height:170px;
+    display:flex;align-items:center;justify-content:center;text-align:center;color:#8097b0;
+    font-size:13px;padding:16px}
+
+  /* Roadmap */
+  .road{position:relative;margin-top:8px}
+  .step{display:flex;gap:14px;padding:12px 0}
+  .dot{width:16px;height:16px;border-radius:50%;flex:0 0 auto;margin-top:5px;border:3px solid #fff;box-shadow:0 0 0 2px var(--line)}
+  .dot.done{background:var(--green);box-shadow:0 0 0 2px var(--green)}
+  .dot.next{background:var(--orange);box-shadow:0 0 0 2px var(--orange)}
+  .dot.soon{background:#cbd5e1;box-shadow:0 0 0 2px #cbd5e1}
+  .step h3{margin:0}
+  .step p{margin:2px 0 0;color:var(--muted);font-size:13.5px}
+  .tag{font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;vertical-align:middle;margin-left:8px}
+  .tag.done{background:#e7f6ee;color:#1d9d6c}
+  .tag.next{background:#fdeede;color:#c9630a}
+  .tag.soon{background:#eef2f7;color:#64748b}
+
+  footer{padding:26px 0;text-align:center;color:var(--muted);font-size:12.5px}
+</style>
+</head>
+<body>
+
+<!-- ===================== HERO ===================== -->
+<div class="hero">
+  <div class="wrap">
+    <div class="badge">SG</div>
+    <div>
+      <h1>SecurityGuard</h1>
+      <p>Windows sunucular için güvenlik izleme ve saldırı engelleme yazılımı. RDP ve SQL Server açık sunucuları dış saldırılara karşı korur, şüpheli her hareketi anında mail ile bildirir.</p>
+      <span class="pill">● Sürüm 1.0 &nbsp;·&nbsp; Windows Server 2012+ / SQL Server 2012+</span>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== NEDİR ===================== -->
+<section><div class="wrap">
+  <h2>SecurityGuard nedir?</h2>
+  <p class="sub">Tek cümlede: sunucunuzu 7/24 izleyen, saldırganı otomatik engelleyen ve sizi haberdar eden bir bekçi.</p>
+  <p class="lead">
+    İnternete açık RDP (Uzak Masaüstü) ve SQL Server, saldırganların en çok hedef aldığı iki kapıdır. SecurityGuard bu
+    kapıları ve sunucudaki kritik olayları sürekli izler: şifre deneyen dış IP'leri <b>otomatik banlar</b>, fidye yazılımı
+    belirtilerini yakalar, veritabanı ve Windows ayarlarındaki tehlikeli değişiklikleri <b>kimin yaptığıyla</b> birlikte
+    raporlar. Küçük–orta ölçekli firmaların Logo/SQL çalıştıran sunucuları düşünülerek tasarlandı:
+    <b>kurması basit, sunucuya yük bindirmez, hiçbir ayarı izinsiz değiştirmez</b> — sadece önerir, uygulama kararı sizindir.
+  </p>
+  <div class="kv">
+    <div><b>7/24</b><span>canlı olay izleme (anlık, saniyeler içinde)</span></div>
+    <div><b>Otomatik</b><span>dış saldırgan IP'yi firewall'da engelleme</span></div>
+    <div><b>Mail</b><span>kritik olaylarda anında bildirim + günlük/aylık rapor</span></div>
+  </div>
+</div></section>
+
+<!-- ===================== ÖZELLİKLER ===================== -->
+<section><div class="wrap">
+  <h2>Ne yapar? — Özellikler</h2>
+  <p class="sub">Tek üründe saldırı engelleme, izleme, fidye koruması, yedekleme ve raporlama.</p>
+  <div class="grid">
+
+    <div class="card">
+      <div class="ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1d9d6c" stroke-width="2"><path d="M12 3l7 3v5c0 4-3 7-7 9-4-2-7-5-7-9V6l7-3z"/></svg></div>
+      <h3>Saldırı engelleme (otomatik ban)</h3>
+      <p>Şifre deneyen dış IP'leri eşiği aşınca firewall'da tüm portlardan engeller.</p>
+      <ul>
+        <li>RDP, SQL, SMB/WinRM, FTP, IIS (Web), SMTP brute-force tespiti</li>
+        <li>Ülke kısıtı (GeoIP): sadece izin verilen ülkeler</li>
+        <li>Port kısıtı: belirli portu yalnızca belirli IP'lere açma</li>
+        <li>İç ağ / sunucu / beyaz liste asla banlanmaz</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <div class="ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1d9d6c" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/></svg></div>
+      <h3>İzleme &amp; anlık alarm</h3>
+      <p>Şüpheli her hareketi yakalar, kimin yaptığıyla birlikte mail atar.</p>
+      <ul>
+        <li>Yeni IP'den / mesai dışı RDP girişi</li>
+        <li>Başarısız denemelerden sonra başarılı giriş (ele geçirme şüphesi)</li>
+        <li>SQL login/rol/şifre, xp_cmdshell gibi tehlikeli ayar değişiklikleri</li>
+        <li>Windows kullanıcı/grup/görev/firewall/audit değişiklikleri</li>
+        <li>Yeni uzaktan erişim programı (AnyDesk, TeamViewer) / servis kurulumu</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <div class="ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1d9d6c" stroke-width="2"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg></div>
+      <h3>Fidye yazılımı koruması</h3>
+      <p>Şifreleme başlamadan erken uyarı.</p>
+      <ul>
+        <li>Tuzak (canary) dosyalar: dokunulursa anında kritik alarm</li>
+        <li>Gölge kopya silme / yedek silme komutlarını yakalama</li>
+        <li>Olay logu temizleme girişimini tespit</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <div class="ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1d9d6c" stroke-width="2"><ellipse cx="12" cy="6" rx="8" ry="3"/><path d="M4 6v6c0 1.7 3.6 3 8 3s8-1.3 8-3V6M4 12v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"/></svg></div>
+      <h3>Yedekleme &amp; bakım</h3>
+      <p>SQL yedeği ve veritabanı bakımı — hepsi kontrollü.</p>
+      <ul>
+        <li>Zamanlanmış SQL yedeği (AES-256 şifreli RAR arşivi)</li>
+        <li>Yedekten geri yükleme ve doğrulama</li>
+        <li>Index bakımı (parçalanma giderme), yedek hatasında kritik mail</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <div class="ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1d9d6c" stroke-width="2"><path d="M4 4h16v12H4z"/><path d="M4 20h16"/><path d="M8 11l3-3 2 2 3-4"/></svg></div>
+      <h3>Raporlar &amp; öneriler</h3>
+      <p>Hem teknik ekibe hem yönetime düzenli özet.</p>
+      <ul>
+        <li>Günlük teknik rapor + aylık yönetici raporu (mail)</li>
+        <li>Güvenlik ve performans taraması: hazır düzeltme script'leriyle</li>
+        <li>Açık portlar, zayıf ayarlar, eksik yedekler listesi</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <div class="ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1d9d6c" stroke-width="2"><path d="M12 2l8 4v6c0 5-3.5 8-8 10-4.5-2-8-5-8-10V6l8-4z"/><path d="M9 12l2 2 4-4"/></svg></div>
+      <h3>Kendini koruma</h3>
+      <p>Saldırgan SecurityGuard'ı sessizce kapatamaz.</p>
+      <ul>
+        <li>Servis Windows'tan durdurulamaz/silinemez (sadece arayüzden, şifreyle)</li>
+        <li>Veritabanı / log klasörleri fidyeye karşı kilitli (SYSTEM sahipli)</li>
+        <li>Olay logu HMAC zinciriyle imzalı: dışarıdan oynama anında fark edilir</li>
+        <li>Beklenmedik kapanma (öldürme/çökme) açılışta bildirilir</li>
+      </ul>
+    </div>
+
+  </div>
+</div></section>
+
+<!-- ===================== TEKNİK YAPI ===================== -->
+<section><div class="wrap">
+  <h2>Teknik yapı</h2>
+  <p class="sub">Hafif, yerel ve güvenli bir mimari — sunucuya ekstra port açmaz.</p>
+
+  <div class="diagram">
+    <svg width="100%" viewBox="0 0 820 320" font-family="Segoe UI,Arial" font-size="12.5">
+      <!-- Sunucu kutusu -->
+      <rect x="20" y="30" width="470" height="260" rx="12" fill="#f6f8fb" stroke="#cdd9e6"/>
+      <text x="38" y="52" fill="#0f2a47" font-weight="700">MÜŞTERİ SUNUCUSU (Windows)</text>
+
+      <!-- Servis -->
+      <rect x="44" y="70" width="190" height="90" rx="10" fill="#0f2a47"/>
+      <text x="60" y="94" fill="#fff" font-weight="700">SecurityGuard Servisi</text>
+      <text x="60" y="114" fill="#aec3da">.NET 4.8 · SYSTEM</text>
+      <text x="60" y="132" fill="#aec3da">izleme · ban · alarm · yedek</text>
+      <text x="60" y="150" fill="#aec3da">olay motoru + koruma</text>
+
+      <!-- UI -->
+      <rect x="44" y="176" width="190" height="86" rx="10" fill="#fff" stroke="#1d9d6c"/>
+      <text x="60" y="200" fill="#0f2a47" font-weight="700">Yönetim Arayüzü (UI)</text>
+      <text x="60" y="219" fill="#64748b">DevExpress WinForms</text>
+      <text x="60" y="237" fill="#64748b">yönetici girişi + şifre</text>
+
+      <!-- Named pipe -->
+      <line x1="139" y1="160" x2="139" y2="176" stroke="#1d9d6c" stroke-width="2"/>
+      <text x="150" y="172" fill="#1d9d6c">named pipe (yerel, port yok)</text>
+
+      <!-- SQLite -->
+      <rect x="264" y="70" width="200" height="56" rx="10" fill="#fff" stroke="#cdd9e6"/>
+      <text x="280" y="92" fill="#0f2a47" font-weight="700">SQLite veritabanı</text>
+      <text x="280" y="110" fill="#64748b">HMAC imzalı olay logu · DPAPI</text>
+
+      <!-- İzlenen kaynaklar -->
+      <rect x="264" y="138" width="200" height="124" rx="10" fill="#fff" stroke="#cdd9e6"/>
+      <text x="280" y="160" fill="#0f2a47" font-weight="700">İzlenen kaynaklar</text>
+      <text x="280" y="180" fill="#64748b">• Windows Olay Logu (4625/4624)</text>
+      <text x="280" y="198" fill="#64748b">• RdpCoreTS · Terminal Services</text>
+      <text x="280" y="216" fill="#64748b">• SQL Server Audit (Application)</text>
+      <text x="280" y="234" fill="#64748b">• Windows Firewall (COM)</text>
+      <text x="280" y="252" fill="#64748b">• Dosya sistemi (tuzak dosyalar)</text>
+
+      <!-- bağlantı servis->kaynaklar -->
+      <line x1="234" y1="100" x2="264" y2="98" stroke="#cdd9e6" stroke-width="2"/>
+      <line x1="234" y1="120" x2="264" y2="175" stroke="#cdd9e6" stroke-width="2"/>
+
+      <!-- Dışarı: Lisans + Mail -->
+      <rect x="560" y="70" width="230" height="70" rx="10" fill="#fff" stroke="#cdd9e6"/>
+      <text x="576" y="94" fill="#0f2a47" font-weight="700">Lisans API (merkezi)</text>
+      <text x="576" y="112" fill="#64748b">ASP.NET Core · RSA imzalı</text>
+      <text x="576" y="130" fill="#64748b">donanım kimliğine bağlı lisans</text>
+
+      <rect x="560" y="160" width="230" height="60" rx="10" fill="#fff" stroke="#cdd9e6"/>
+      <text x="576" y="184" fill="#0f2a47" font-weight="700">Mail (SMTP)</text>
+      <text x="576" y="202" fill="#64748b">alarm + günlük/aylık rapor</text>
+
+      <!-- oklar dışarı (sadece OUTBOUND) -->
+      <line x1="490" y1="105" x2="560" y2="105" stroke="#1d9d6c" stroke-width="2" marker-end="url(#a)"/>
+      <line x1="490" y1="190" x2="560" y2="190" stroke="#1d9d6c" stroke-width="2" marker-end="url(#a)"/>
+      <text x="498" y="98" fill="#1d9d6c">dışa doğru →</text>
+
+      <defs><marker id="a" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+        <path d="M0,0 L6,3 L0,6 Z" fill="#1d9d6c"/></marker></defs>
+    </svg>
+  </div>
+
+  <div class="tech">
+    <div><b>Canlı olay dinleme:</b> Windows olayları push ile (EventLogWatcher) anında işlenir — aralıkla taramaz, saniyeler içinde tepki verir.</div>
+    <div><b>Yerel yönetim:</b> UI ile servis arası named pipe; ağa hiçbir port açılmaz (saldırı yüzeyi büyümez).</div>
+    <div><b>Kurcalamaya dayanıklı log:</b> olaylar HMAC zinciriyle imzalı; biri SQLite'ı açıp satır silse/değiştirse bütünlük kontrolü yakalar.</div>
+    <div><b>Şifreli sırlar:</b> SQL/mail şifreleri DPAPI ile makineye bağlı şifreli; log/arayüzde asla düz metin görünmez.</div>
+    <div><b>GeoIP:</b> IP→ülke veritabanı kurulumla gelir, internet varsa aylık güncellenir.</div>
+    <div><b>Lisans:</b> donanım kimliğine bağlı, RSA imzalı; çevrimdışı toleransı var, sahte sunucu cevabı reddedilir.</div>
+  </div>
+</div></section>
+
+<!-- ===================== EKRAN GÖRÜNTÜLERİ ===================== -->
+<section><div class="wrap">
+  <h2>Ekran görüntüleri</h2>
+  <p class="sub">Aşağıdaki kutulara uygulamadan ekran görüntüsü ekleyin (her birini bir &lt;img&gt; ile değiştirin).</p>
+  <!-- NOT: Her .shot kutusunu şöyle değiştirin:  <img src="panel.png" style="width:100%;border-radius:12px;border:1px solid var(--line)"> -->
+  <div class="shots">
+    <div class="shot">Ekran görüntüsü: <b>&nbsp;Panel (Dashboard)</b></div>
+    <div class="shot">Ekran görüntüsü: <b>&nbsp;Ban Listesi / Giriş Denemeleri</b></div>
+    <div class="shot">Ekran görüntüsü: <b>&nbsp;Günlük / Aylık rapor maili</b></div>
+    <div class="shot">Ekran görüntüsü: <b>&nbsp;Güvenlik Önerileri taraması</b></div>
+  </div>
+</div></section>
+
+<!-- ===================== YOL HARİTASI ===================== -->
+<section><div class="wrap">
+  <h2>Sonra yapılacaklar — Yol haritası</h2>
+  <p class="sub">Çekirdek ürün ve kurulum tamamlandı; sıradaki hedef merkezi yönetim.</p>
+  <div class="road">
+
+    <div class="step">
+      <div class="dot done"></div>
+      <div>
+        <h3>Çekirdek ürün <span class="tag done">TAMAMLANDI</span></h3>
+        <p>Saldırı engelleme, izleme/alarm, fidye koruması, yedek/bakım, raporlar, kendini koruma, lisanslama. Gerçek sunucuda canlı test edildi.</p>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="dot done"></div>
+      <div>
+        <h3>Kurulum paketi (Setup) <span class="tag done">TAMAMLANDI</span></h3>
+        <p>Tek tıkla kurulum (Inno Setup): servisi kurar/başlatır, sihirbazla SQL/mail/lisans. Güncelleme ve kaldırma kimlikli (SG şifresi şart) — korumalı servis güvenle yönetilir.</p>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="dot next"></div>
+      <div>
+        <h3>Merkezi yönetim (web + API) <span class="tag next">SIRADA</span></h3>
+        <p>Tüm müşteri sunucularını tek panelden izleme. Ajan dışarı doğru merkeze bağlanır (müşteride port açılmaz, NAT arkasında çalışır). Faz 1: toplu durum/alarm paneli (sadece okuma). Faz 2: imzalı komutlarla uzaktan ayar/işlem.</p>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="dot soon"></div>
+      <div>
+        <h3>Merkezi versiyon güncelleme <span class="tag soon">PLANLANDI</span></h3>
+        <p>Yeni sürümü tek yerden tüm müşterilere dağıtma. İmzalı paket (RSA doğrulama zorunlu), küçük bir güncelleyici dosyaların yerini değiştirir; geri dönüş (rollback) ve zamanlanmış/kademeli yayım ile güvenli.</p>
+      </div>
+    </div>
+
+  </div>
+</div></section>
+
+<footer>
+  SecurityGuard — Sunucu güvenlik izleme ve saldırı engelleme &nbsp;·&nbsp; Bu doküman tanıtım amaçlıdır.
+</footer>
+
+</body>
+</html>

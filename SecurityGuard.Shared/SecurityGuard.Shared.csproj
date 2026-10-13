@@ -1,0 +1,83 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProjectGuid>{E4106360-F620-42C4-A806-B87F75DCDCD2}</ProjectGuid>
+    <OutputType>Library</OutputType>
+    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <RootNamespace>SecurityGuard.Shared</RootNamespace>
+    <AssemblyName>SecurityGuard.Shared</AssemblyName>
+    <TargetFrameworkVersion>v4.8</TargetFrameworkVersion>
+    <FileAlignment>512</FileAlignment>
+    <Deterministic>true</Deterministic>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>bin\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <OutputPath>bin\Release\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="System" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Runtime.Serialization" />
+    <Reference Include="System.Xml" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="Contracts\Commands.cs" />
+    <Compile Include="Licensing\LicenseProtocol.cs" />
+    <Compile Include="Dto\LicenseDtos.cs" />
+    <Compile Include="Contracts\ErrorCodes.cs" />
+    <Compile Include="Contracts\PipeProtocol.cs" />
+    <Compile Include="Contracts\PipeRequest.cs" />
+    <Compile Include="Contracts\PipeResponse.cs" />
+    <Compile Include="Dto\AuditTrailDtos.cs" />
+    <Compile Include="Dto\AuthDtos.cs" />
+    <Compile Include="Dto\MailDtos.cs" />
+    <Compile Include="Dto\MaintenanceDtos.cs" />
+    <Compile Include="Dto\ReportDtos.cs" />
+    <Compile Include="Dto\RuleDtos.cs" />
+    <Compile Include="Dto\ServiceDtos.cs" />
+    <Compile Include="Dto\SetupDtos.cs" />
+    <Compile Include="Dto\SqlDtos.cs" />
+    <Compile Include="Dto\SqliteDtos.cs" />
+    <Compile Include="Dto\DashboardDtos.cs" />
+    <Compile Include="Dto\EventLogDtos.cs" />
+    <Compile Include="Dto\BackupDtos.cs" />
+    <Compile Include="Dto\PortRestrictionDtos.cs" />
+    <Compile Include="Dto\CanaryDtos.cs" />
+    <Compile Include="Dto\OpenPortDtos.cs" />
+    <Compile Include="Dto\RdpSessionDtos.cs" />
+    <Compile Include="Dto\ServiceWatchDtos.cs" />
+    <Compile Include="Dto\BanDtos.cs" />
+    <Compile Include="Dto\CheckDtos.cs" />
+    <Compile Include="Dto\GeneralSettingsDtos.cs" />
+    <Compile Include="Dto\StatusDto.cs" />
+    <Compile Include="Dto\ThemeDto.cs" />
+    <Compile Include="Dto\WhitelistDtos.cs" />
+    <Compile Include="Enums\CheckStatus.cs" />
+    <Compile Include="Enums\LogLevel.cs" />
+    <Compile Include="Enums\MailSecurity.cs" />
+    <Compile Include="Enums\Severity.cs" />
+    <Compile Include="GuardConstants.cs" />
+    <!-- Lisans sunucusu adresi: LicenseServer.Local.cs varsa (git'e girmez, gerçek adres) o, yoksa yer tutucu derlenir -->
+    <Compile Include="LicenseServer.Local.cs" Condition="Exists('LicenseServer.Local.cs')" />
+    <Compile Include="LicenseServer.cs" Condition="!Exists('LicenseServer.Local.cs')" />
+    <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="UtcTime.cs" />
+  </ItemGroup>
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+</Project>

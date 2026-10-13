@@ -1,0 +1,392 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProductVersion>8.0.30703</ProductVersion>
+    <SchemaVersion>2.0</SchemaVersion>
+    <ProjectGuid>{7522C6A0-3F44-4794-B232-04A7ADA4E1FD}</ProjectGuid>
+    <OutputType>WinExe</OutputType>
+    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <RootNamespace>SecurityGuardUI</RootNamespace>
+    <AssemblyName>SecurityGuardUI</AssemblyName>
+    <TargetFrameworkVersion>v4.8</TargetFrameworkVersion>
+    <FileAlignment>512</FileAlignment>
+    <!-- Tek dil Türkçe: DevExpress'in diğer dil klasörleri (de, es, ja, ru) ve XML dokümanları çıktıya kopyalanmasın -->
+    <AllowedReferenceRelatedFileExtensions>.pdb</AllowedReferenceRelatedFileExtensions>
+    <!-- Release: yönetici olarak açılır. Debug: normal kullanıcı (VS'i yönetici açmaya gerek kalmaz) -->
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationManifest Condition=" '$(Configuration)' == 'Debug' ">app.Debug.manifest</ApplicationManifest>
+    <ApplicationIcon>Resources\AppIcon.ico</ApplicationIcon>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <Prefer32Bit>false</Prefer32Bit>
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>..\bin\Debug\SecurityGuard\UI\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <Prefer32Bit>false</Prefer32Bit>
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <OutputPath>..\bin\Release\SecurityGuard\UI\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="DevExpress.BonusSkins.v20.1" />
+    <Reference Include="DevExpress.Data.Desktop.v20.1" />
+    <Reference Include="DevExpress.Data.v20.1" />
+    <Reference Include="DevExpress.Utils.v20.1" />
+    <Reference Include="DevExpress.Sparkline.v20.1.Core" />
+    <Reference Include="DevExpress.XtraBars.v20.1" />
+    <Reference Include="DevExpress.XtraGrid.v20.1" />
+    <Reference Include="DevExpress.XtraEditors.v20.1" />
+    <Reference Include="DevExpress.Printing.v20.1.Core" />
+    <Reference Include="System" />
+    <Reference Include="System.Core" />
+    <!-- Servis durumunu okuma / başlatma (AppFlow ve Servis Yönetimi) -->
+    <Reference Include="System.ServiceProcess" />
+    <Reference Include="System.Xml.Linq" />
+    <Reference Include="System.Data.DataSetExtensions" />
+    <Reference Include="Microsoft.CSharp" />
+    <Reference Include="System.Data" />
+    <Reference Include="System.Deployment" />
+    <Reference Include="System.Drawing" />
+    <Reference Include="System.Windows.Forms" />
+    <Reference Include="System.Xml" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="AppFlow.cs" />
+    <Compile Include="Controls\CodeEditor.cs">
+      <SubType>Component</SubType>
+    </Compile>
+    <Compile Include="Controls\HtmlCodeEditor.cs">
+      <SubType>Component</SubType>
+    </Compile>
+    <Compile Include="Controls\SqlCodeEditor.cs">
+      <SubType>Component</SubType>
+    </Compile>
+    <Compile Include="Forms\BanAddForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Forms\BanAddForm.Designer.cs">
+      <DependentUpon>BanAddForm.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Forms\LoginForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Forms\LoginForm.Designer.cs">
+      <DependentUpon>LoginForm.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Forms\MainForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Forms\MainForm.Designer.cs">
+      <DependentUpon>MainForm.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Forms\WhitelistAddForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Forms\WhitelistAddForm.Designer.cs">
+      <DependentUpon>WhitelistAddForm.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Forms\PasswordConfirmForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Forms\PasswordConfirmForm.Designer.cs">
+      <DependentUpon>PasswordConfirmForm.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Forms\RecipientPickerForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Forms\RecipientPickerForm.Designer.cs">
+      <DependentUpon>RecipientPickerForm.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Forms\SetupWizardForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Forms\SetupAdminForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Forms\SetupAdminForm.Designer.cs">
+      <DependentUpon>SetupAdminForm.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Helpers\AppImages.cs" />
+    <Compile Include="Helpers\GridHelper.cs" />
+    <Compile Include="Helpers\HandCursor.cs" />
+    <Compile Include="Helpers\IdleWatcher.cs" />
+    <Compile Include="Helpers\RdpSession.cs" />
+    <Compile Include="Helpers\ServiceControl.cs" />
+    <Compile Include="Helpers\ThemeManager.cs" />
+    <Compile Include="Helpers\TurkishLocalizer.cs" />
+    <Compile Include="Helpers\Ui.cs" />
+    <Compile Include="Helpers\UiColors.cs" />
+    <Compile Include="Ipc\GuardClient.cs" />
+    <Compile Include="Ipc\GuardResult.cs" />
+    <Compile Include="Ipc\NativeMethods.cs" />
+    <Compile Include="Modules\AuditTrailModule.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="Modules\AuditTrailModule.Designer.cs">
+      <DependentUpon>AuditTrailModule.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Modules\BanListModule.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="Modules\BanListModule.Designer.cs">
+      <DependentUpon>BanListModule.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Modules\SqlRequiredModule.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="Modules\ReportsModule.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="Modules\ReportsModule.Designer.cs">
+      <DependentUpon>ReportsModule.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Modules\MaintenanceModule.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="Modules\MaintenanceModule.Designer.cs">
+      <DependentUpon>MaintenanceModule.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Modules\BackupModule.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="Modules\BackupModule.Designer.cs">
+      <DependentUpon>BackupModule.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Modules\ChecksModule.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="Modules\ChecksModule.Designer.cs">
+      <DependentUpon>ChecksModule.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Modules\DashboardModule.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="Modules\DashboardModule.Designer.cs">
+      <DependentUpon>DashboardModule.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Modules\EventLogModule.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="Modules\EventLogModule.Designer.cs">
+      <DependentUpon>EventLogModule.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Modules\GeneralSettingsModule.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="Modules\GeneralSettingsModule.Designer.cs">
+      <DependentUpon>GeneralSettingsModule.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Modules\MailModule.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="Modules\MailModule.Designer.cs">
+      <DependentUpon>MailModule.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Modules\ModuleBase.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="Modules\RulesModule.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="Modules\RulesModule.Designer.cs">
+      <DependentUpon>RulesModule.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Modules\ServiceModule.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="Modules\ServiceModule.Designer.cs">
+      <DependentUpon>ServiceModule.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Modules\SqlModule.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="Modules\SqlModule.Designer.cs">
+      <DependentUpon>SqlModule.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Modules\SqliteModule.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="Modules\SqliteModule.Designer.cs">
+      <DependentUpon>SqliteModule.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Modules\LicenseModule.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="Modules\ServiceWatchModule.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="Modules\RdpSessionsModule.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="Forms\WorkHoursForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Modules\OpenPortsModule.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="Modules\CanaryModule.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="Modules\PortRestrictionsModule.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="Forms\PortRestrictionEditForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Modules\WhitelistModule.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="Modules\WhitelistModule.Designer.cs">
+      <DependentUpon>WhitelistModule.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Modules\PlaceholderModule.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="Program.cs" />
+    <Compile Include="Setup\CliSetup.cs" />
+    <Compile Include="Properties\AssemblyInfo.cs" />
+    <EmbeddedResource Include="Properties\licenses.licx" />
+    <EmbeddedResource Include="Properties\Resources.resx">
+      <Generator>ResXFileCodeGenerator</Generator>
+      <LastGenOutput>Resources.Designer.cs</LastGenOutput>
+      <SubType>Designer</SubType>
+    </EmbeddedResource>
+    <Compile Include="Properties\Resources.Designer.cs">
+      <AutoGen>True</AutoGen>
+      <DependentUpon>Resources.resx</DependentUpon>
+    </Compile>
+    <None Include="App.config" />
+    <None Include="app.Debug.manifest" />
+    <None Include="app.manifest" />
+    <None Include="Properties\Settings.settings">
+      <Generator>SettingsSingleFileGenerator</Generator>
+      <LastGenOutput>Settings.Designer.cs</LastGenOutput>
+    </None>
+    <Compile Include="Properties\Settings.Designer.cs">
+      <AutoGen>True</AutoGen>
+      <DependentUpon>Settings.settings</DependentUpon>
+      <DesignTimeSharedInput>True</DesignTimeSharedInput>
+    </Compile>
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\SecurityGuard.Shared\SecurityGuard.Shared.csproj">
+      <Project>{E4106360-F620-42C4-A806-B87F75DCDCD2}</Project>
+      <Name>SecurityGuard.Shared</Name>
+    </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Program ikonu ve logo: exe'ye gömülü, çıktı klasörüne ayrı dosya olarak kopyalanmaz -->
+    <EmbeddedResource Include="Resources\AppIcon.ico">
+      <LogicalName>SecurityGuardUI.AppIcon.ico</LogicalName>
+    </EmbeddedResource>
+    <!-- Menü ikonları: DevExpress Icon Builder SVG'leri (DevExpress.Images DLL'i 8 MB olduğu için sadece kullanılanlar) -->
+    <EmbeddedResource Include="Resources\Menu\actions_bell.svg">
+      <LogicalName>SecurityGuardUI.Menu.actions_bell.svg</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Resources\Menu\actions_book.svg">
+      <LogicalName>SecurityGuardUI.Menu.actions_book.svg</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Resources\Menu\actions_checkcircled.svg">
+      <LogicalName>SecurityGuardUI.Menu.actions_checkcircled.svg</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Resources\Menu\actions_database.svg">
+      <LogicalName>SecurityGuardUI.Menu.actions_database.svg</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Resources\Menu\actions_envelopeclose.svg">
+      <LogicalName>SecurityGuardUI.Menu.actions_envelopeclose.svg</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Resources\Menu\actions_filter.svg">
+      <LogicalName>SecurityGuardUI.Menu.actions_filter.svg</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Resources\Menu\actions_forbid.svg">
+      <LogicalName>SecurityGuardUI.Menu.actions_forbid.svg</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Resources\Menu\actions_home.svg">
+      <LogicalName>SecurityGuardUI.Menu.actions_home.svg</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Resources\Menu\actions_hyperlink.svg">
+      <LogicalName>SecurityGuardUI.Menu.actions_hyperlink.svg</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Resources\Menu\actions_options.svg">
+      <LogicalName>SecurityGuardUI.Menu.actions_options.svg</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Resources\Menu\actions_refresh.svg">
+      <LogicalName>SecurityGuardUI.Menu.actions_refresh.svg</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Resources\Menu\actions_settings.svg">
+      <LogicalName>SecurityGuardUI.Menu.actions_settings.svg</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Resources\Menu\actions_table.svg">
+      <LogicalName>SecurityGuardUI.Menu.actions_table.svg</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Resources\Menu\business_idea.svg">
+      <LogicalName>SecurityGuardUI.Menu.business_idea.svg</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Resources\Menu\business_linearchart.svg">
+      <LogicalName>SecurityGuardUI.Menu.business_linearchart.svg</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Resources\Menu\business_report.svg">
+      <LogicalName>SecurityGuardUI.Menu.business_report.svg</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Resources\Menu\business_safe.svg">
+      <LogicalName>SecurityGuardUI.Menu.business_safe.svg</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Resources\Menu\electronics_desktopwindows.svg">
+      <LogicalName>SecurityGuardUI.Menu.electronics_desktopwindows.svg</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Resources\Menu\security_key.svg">
+      <LogicalName>SecurityGuardUI.Menu.security_key.svg</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Resources\Menu\actions_clock.svg">
+      <LogicalName>SecurityGuardUI.Menu.actions_clock.svg</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Resources\Menu\security_unlock.svg">
+      <LogicalName>SecurityGuardUI.Menu.security_unlock.svg</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Resources\Menu\security_bug.svg">
+      <LogicalName>SecurityGuardUI.Menu.security_bug.svg</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Resources\Menu\security_security.svg">
+      <LogicalName>SecurityGuardUI.Menu.security_security.svg</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Resources\Menu\security_lock.svg">
+      <LogicalName>SecurityGuardUI.Menu.security_lock.svg</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Resources\Menu\security_visibility.svg">
+      <LogicalName>SecurityGuardUI.Menu.security_visibility.svg</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Resources\Menu\security_warning.svg">
+      <LogicalName>SecurityGuardUI.Menu.security_warning.svg</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Resources\AppLogo.png">
+      <LogicalName>SecurityGuardUI.AppLogo.png</LogicalName>
+    </EmbeddedResource>
+  </ItemGroup>
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <!-- Referansların Türkçe dışındaki dil kaynak klasörlerini çıktıya kopyalama -->
+  <Target Name="RemoveNonTurkishSatellites" AfterTargets="ResolveAssemblyReferences">
+    <ItemGroup>
+      <ReferenceCopyLocalPaths Remove="@(ReferenceCopyLocalPaths)" Condition="'%(ReferenceCopyLocalPaths.DestinationSubDirectory)' != '' And '%(ReferenceCopyLocalPaths.DestinationSubDirectory)' != 'tr\'" />
+    </ItemGroup>
+  </Target>
+  <!-- To modify your build process, add your task inside one of the targets below and uncomment it.
+       Other similar extension points exist, see Microsoft.Common.targets.
+  <Target Name="BeforeBuild">
+  </Target>
+  <Target Name="AfterBuild">
+  </Target>
+  -->
+</Project>

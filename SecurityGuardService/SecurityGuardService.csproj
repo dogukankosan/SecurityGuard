@@ -1,0 +1,202 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProjectGuid>{558CCDF5-9D26-4812-B087-964444035882}</ProjectGuid>
+    <!-- Exe: servis olarak da çalışır; VS'ten F5 ile açıldığında konsol penceresi gösterir -->
+    <OutputType>Exe</OutputType>
+    <RootNamespace>SecurityGuardService</RootNamespace>
+    <AssemblyName>SecurityGuardService</AssemblyName>
+    <TargetFrameworkVersion>v4.8</TargetFrameworkVersion>
+    <FileAlignment>512</FileAlignment>
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <Deterministic>true</Deterministic>
+    <!-- UI ile aynı program ikonu (tek dosya, kopya yok) -->
+    <ApplicationIcon>..\SecurityGuardUI\Resources\AppIcon.ico</ApplicationIcon>
+    <!-- NuGet paketleri PackageReference ile: alt bağımlılıklar otomatik çözülür -->
+    <RestoreProjectStyle>PackageReference</RestoreProjectStyle>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <Prefer32Bit>false</Prefer32Bit>
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>..\bin\Debug\SecurityGuard\Service\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <Prefer32Bit>false</Prefer32Bit>
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <OutputPath>..\bin\Release\SecurityGuard\Service\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="System" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Security" />
+    <Reference Include="System.Xml.Linq" />
+    <Reference Include="System.Data.DataSetExtensions" />
+    <Reference Include="Microsoft.CSharp" />
+    <Reference Include="System.Data" />
+    <Reference Include="System.Net.Http" />
+    <Reference Include="System.ServiceProcess" />
+    <Reference Include="System.Management" />
+    <Reference Include="System.DirectoryServices" />
+    <Reference Include="System.DirectoryServices.AccountManagement" />
+    <Reference Include="System.Xml" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="Checks\CheckContext.cs" />
+    <Compile Include="Checks\CheckRunner.cs" />
+    <Compile Include="Checks\CheckStore.cs" />
+    <Compile Include="Checks\SqlQuery.cs" />
+    <Compile Include="Checks\Performance\PerformanceScan.cs" />
+    <Compile Include="Checks\Performance\SqlPerformanceChecks.cs" />
+    <Compile Include="Checks\Performance\WindowsNative.cs" />
+    <Compile Include="Checks\Performance\WindowsPerformanceChecks.cs" />
+    <Compile Include="Ipc\Handlers\CheckHandlers.cs" />
+    <Compile Include="Sql\SqlMaintenance.cs" />
+    <Compile Include="Sql\SqlBackup.cs" />
+    <Compile Include="Sql\SqlJobGate.cs" />
+    <Compile Include="Ipc\Handlers\BackupHandlers.cs" />
+    <Compile Include="Ipc\Handlers\PortRestrictionHandlers.cs" />
+    <Compile Include="Ipc\Handlers\CanaryHandlers.cs" />
+    <Compile Include="Ipc\Handlers\OpenPortsHandlers.cs" />
+    <Compile Include="Ipc\Handlers\RdpSessionHandlers.cs" />
+    <Compile Include="Ipc\Handlers\LicenseHandlers.cs" />
+    <Compile Include="Licensing\HardwareId.cs" />
+    <Compile Include="Licensing\LicenseGate.cs" />
+    <Compile Include="Licensing\LicenseManager.cs" />
+    <Compile Include="Ipc\Handlers\ServiceWatchHandlers.cs" />
+    <Compile Include="Ipc\Handlers\MaintenanceHandlers.cs" />
+    <Compile Include="Engine\Reports\DailyReport.cs" />
+    <Compile Include="Engine\Reports\MonthlyReport.cs" />
+    <Compile Include="Engine\Reports\Dashboard.cs" />
+    <Compile Include="Engine\Health\SystemWatch.cs" />
+    <Compile Include="Engine\Health\SoftwareWatch.cs" />
+    <Compile Include="Engine\Health\TaskWatch.cs" />
+    <Compile Include="Sql\SqlConfigTrail.cs" />
+    <Compile Include="Engine\Health\RdpSessionTracker.cs" />
+    <Compile Include="Engine\Health\ServiceWatch.cs" />
+    <Compile Include="Engine\Health\SelfProtection.cs" />
+    <Compile Include="Engine\Health\ResourceMonitor.cs" />
+    <Compile Include="Ipc\Handlers\DashboardHandlers.cs" />
+    <Compile Include="Ipc\Handlers\SetupHandlers.cs" />
+    <Compile Include="Ipc\Handlers\ReportHandlers.cs" />
+    <Compile Include="Checks\Security\SecurityNative.cs" />
+    <Compile Include="Checks\Security\SecurityScan.cs" />
+    <Compile Include="Checks\Security\SqlSecurityChecks.cs" />
+    <Compile Include="Checks\Security\WindowsSecurityChecks.cs" />
+    <Compile Include="Core\AppPaths.cs" />
+    <Compile Include="Core\Data\DbExtensions.cs" />
+    <Compile Include="Core\Data\DbTime.cs" />
+    <Compile Include="Core\Data\DbWriter.cs" />
+    <Compile Include="Core\Data\GuardDatabase.cs" />
+    <Compile Include="Core\Data\Migrations.cs" />
+    <Compile Include="Core\Data\SchemaMigrator.cs" />
+    <Compile Include="Core\Data\AuditTrail.cs" />
+    <Compile Include="Core\GuardContext.cs" />
+    <Compile Include="Core\GuardException.cs" />
+    <Compile Include="Core\Logging\AppLog.cs" />
+    <Compile Include="Core\Net\IpRange.cs" />
+    <Compile Include="Core\Security\AdminAccount.cs" />
+    <Compile Include="Core\Security\HmacChain.cs" />
+    <Compile Include="Core\Security\PasswordHasher.cs" />
+    <Compile Include="Core\Security\SecretProtector.cs" />
+    <Compile Include="Core\Settings\SettingKeys.cs" />
+    <Compile Include="Core\Settings\SettingsStore.cs" />
+    <Compile Include="Engine\Ban\Whitelist.cs" />
+    <Compile Include="Engine\Rules\EventCatalog.cs" />
+    <Compile Include="Engine\Rules\RuleStore.cs" />
+    <Compile Include="GuardHost.cs" />
+    <Compile Include="Ipc\CommandRouter.cs" />
+    <Compile Include="Ipc\Handlers\AuditTrailHandlers.cs" />
+    <Compile Include="Ipc\Handlers\MailHandlers.cs" />
+    <Compile Include="Mail\MailComposer.cs" />
+    <Compile Include="Mail\MailService.cs" />
+    <Compile Include="Mail\SmtpSender.cs" />
+    <Compile Include="Ipc\Handlers\RuleHandlers.cs" />
+    <Compile Include="Ipc\Handlers\ServiceHandlers.cs" />
+    <Compile Include="ServiceSetup.cs" />
+    <Compile Include="Ipc\Handlers\SqlHandlers.cs" />
+    <Compile Include="Ipc\Handlers\SqliteHandlers.cs" />
+    <Compile Include="Ipc\Handlers\EventLogHandlers.cs" />
+    <Compile Include="Ipc\Handlers\BanHandlers.cs" />
+    <Compile Include="Engine\Ban\BanManager.cs" />
+    <Compile Include="Engine\Ban\BanFirewall.cs" />
+    <Compile Include="Engine\Firewall\IpIntervals.cs" />
+    <Compile Include="Engine\Firewall\GeoIpDatabase.cs" />
+    <Compile Include="Engine\Firewall\FirewallCom.cs" />
+    <Compile Include="Engine\Firewall\PortFirewall.cs" />
+    <Compile Include="Engine\Firewall\PortRestrictions.cs" />
+    <Compile Include="Engine\Canary\CanaryFiles.cs" />
+    <Compile Include="Checks\Security\OpenPorts.cs" />
+    <Compile Include="Engine\Canary\CanaryNative.cs" />
+    <Compile Include="Engine\Collectors\RansomwareIndicators.cs" />
+    <Compile Include="Engine\Collectors\RawEvent.cs" />
+    <Compile Include="Engine\Collectors\ChannelWatcher.cs" />
+    <Compile Include="Engine\Collectors\WindowsEventProcessor.cs" />
+    <Compile Include="Engine\Collectors\CollectorHost.cs" />
+    <Compile Include="Engine\Collectors\IisLogCollector.cs" />
+    <Compile Include="Engine\Events\EventRecorder.cs" />
+    <Compile Include="Engine\Events\MailBatcher.cs" />
+    <Compile Include="Ipc\Handlers\GeneralSettingsHandlers.cs" />
+    <Compile Include="Core\Settings\GeneralSettings.cs" />
+    <Compile Include="Core\Data\SqliteConsole.cs" />
+    <Compile Include="Core\Data\EventLogAdminChanges.cs" />
+    <Compile Include="Sql\SqlConnectionStore.cs" />
+    <Compile Include="Sql\SqlDiscovery.cs" />
+    <Compile Include="Sql\SqlAuditEvents.cs" />
+    <Compile Include="Sql\SqlAuditManager.cs" />
+    <Compile Include="Sql\SqlMonitor.cs" />
+    <Compile Include="Sql\SqlBaseline.cs" />
+    <Compile Include="Ipc\Handlers\SystemHandlers.cs" />
+    <Compile Include="Ipc\Handlers\WhitelistHandlers.cs" />
+    <Compile Include="Ipc\PipeServer.cs" />
+    <Compile Include="Ipc\SessionManager.cs" />
+    <Compile Include="GuardService.cs">
+      <SubType>Component</SubType>
+    </Compile>
+    <Compile Include="GuardService.Designer.cs">
+      <DependentUpon>GuardService.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Program.cs" />
+    <Compile Include="Properties\AssemblyInfo.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\SecurityGuard.Shared\SecurityGuard.Shared.csproj">
+      <Project>{E4106360-F620-42C4-A806-B87F75DCDCD2}</Project>
+      <Name>SecurityGuard.Shared</Name>
+    </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="Checks\Sql\" />
+    <Folder Include="Checks\Windows\" />
+    <Folder Include="Collectors\Sql\" />
+    <Folder Include="Collectors\Windows\" />
+    <Folder Include="Core\Models\" />
+    <Folder Include="Engine\Firewall\" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="App.config" />
+    <None Include="GeoIP\dbip-country-lite-2026-10.csv.gz">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <!-- SQLite veritabanı -->
+    <PackageReference Include="System.Data.SQLite.Core" Version="1.0.119" />
+    <!-- SMTP: 465 (SSL) ve 587 (STARTTLS) desteği için (System.Net.Mail.SmtpClient 465'i desteklemez) -->
+    <PackageReference Include="MailKit" Version="4.18.1" />
+  </ItemGroup>
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+</Project>
