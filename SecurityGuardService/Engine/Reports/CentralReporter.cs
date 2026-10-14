@@ -33,6 +33,7 @@ namespace SecurityGuardService.Engine.Reports
         private readonly CancellationTokenSource _cts = new CancellationTokenSource();
         private Thread _thread;
         private string _lastError;
+        private bool _sentOnce;
 
         public CentralReporter(GuardContext g)
         {
@@ -47,6 +48,11 @@ namespace SecurityGuardService.Engine.Reports
 
         private void Loop()
         {
+            bool enabled = _g.Settings.GetBool(SettingKeys.CentralReportEnabled, true);
+            AppLog.Info(Module, enabled
+                ? "Merkezi panel bildirimi AÇIK (hub: " + _g.License.ApiUrl + Path + ", her " + (int)Interval.TotalMinutes + " dk)."
+                : "Merkezi panel bildirimi kapalı (central.reportEnabled = false).");
+
             // Açılıştan ~30 sn sonra ilk gönderim (servis otursun), sonra her Interval
             if (_cts.Token.WaitHandle.WaitOne(TimeSpan.FromSeconds(30))) return;
             while (!_cts.IsCancellationRequested)
@@ -58,8 +64,8 @@ namespace SecurityGuardService.Engine.Reports
                 }
                 catch (Exception ex)
                 {
-                    // Hata tekrarını spam'lemeden bir kez logla
-                    if (_lastError != ex.Message) { AppLog.Debug(Module, "Heartbeat gönderilemedi: " + ex.Message); _lastError = ex.Message; }
+                    // Hata tekrarını spam'lemeden bir kez logla (teşhis için Warn)
+                    if (_lastError != ex.Message) { AppLog.Warn(Module, "Hub'a durum gönderilemedi: " + ex.Message); _lastError = ex.Message; }
                 }
                 if (_cts.Token.WaitHandle.WaitOne(Interval)) return;
             }
@@ -72,6 +78,7 @@ namespace SecurityGuardService.Engine.Reports
             byte[] body = Encoding.UTF8.GetBytes(PipeProtocol.ToJson(dto));
             Post(url, body, dto.AgentVersion);
             _lastError = null;
+            if (!_sentOnce) { AppLog.Info(Module, "Hub'a ilk durum bildirimi başarıyla gönderildi."); _sentOnce = true; }
         }
 
         private HeartbeatDto BuildSnapshot()
@@ -161,7 +168,7 @@ namespace SecurityGuardService.Engine.Reports
             catch (WebException ex) when (ex.Response is HttpWebResponse r && r.StatusCode == HttpStatusCode.Forbidden)
             {
                 using (r) { }
-                if (_lastError != "403") { AppLog.Debug(Module, "Hub bu makinenin aktif lisansını bulamadı (403): panelde görünmeyecek."); _lastError = "403"; }
+                if (_lastError != "403") { AppLog.Warn(Module, "Hub bu makinenin aktif lisansını bulamadı (403): panelde görünmeyecek."); _lastError = "403"; }
             }
         }
 
