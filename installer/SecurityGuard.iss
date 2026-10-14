@@ -42,8 +42,8 @@ Name: "tr"; MessagesFile: "compiler:Languages\Turkish.isl"
 Source: "{#SrcRoot}\Service\*"; DestDir: "{app}\Service"; Flags: recursesubdirs ignoreversion; Excludes: "*.pdb"
 ; Arayüz klasörü (DevExpress + UI + SgAutoTest)
 Source: "{#SrcRoot}\UI\*"; DestDir: "{app}\UI"; Flags: recursesubdirs ignoreversion; Excludes: "*.pdb"
-; Merkezi güncelleme aracı (kök altındaki Updater klasöründe; Service/UI değiştirilirken kilitlenmez)
-Source: "{#SrcRoot}\SecurityGuardUpdater.exe"; DestDir: "{app}\Updater"; Flags: ignoreversion
+; Merkezi güncelleme aracı (kök altındaki Updater klasöründe; Service/UI değiştirilirken kilitlenmez). DevExpress DLL'leriyle birlikte.
+Source: "{#SrcRoot}\Updater\*"; DestDir: "{app}\Updater"; Flags: recursesubdirs ignoreversion; Excludes: "*.pdb,*.xml"
 
 [Icons]
 Name: "{group}\SecurityGuard"; Filename: "{app}\UI\{#UiExe}"

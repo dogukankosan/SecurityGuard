@@ -5,7 +5,7 @@
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
     <ProjectGuid>{F2B9A4D1-7C3E-4A8B-9D2F-5E6A1B0C3D77}</ProjectGuid>
-    <OutputType>Exe</OutputType>
+    <OutputType>WinExe</OutputType>
     <RootNamespace>SecurityGuardUpdater</RootNamespace>
     <AssemblyName>SecurityGuardUpdater</AssemblyName>
     <TargetFrameworkVersion>v4.8</TargetFrameworkVersion>
@@ -18,7 +18,7 @@
     <DebugSymbols>true</DebugSymbols>
     <DebugType>full</DebugType>
     <Optimize>false</Optimize>
-    <OutputPath>..\..\bin\Debug\SecurityGuard\</OutputPath>
+    <OutputPath>..\..\bin\Debug\SecurityGuard\Updater\</OutputPath>
     <DefineConstants>DEBUG;TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
@@ -26,7 +26,7 @@
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugType>pdbonly</DebugType>
     <Optimize>true</Optimize>
-    <OutputPath>..\..\bin\Release\SecurityGuard\</OutputPath>
+    <OutputPath>..\..\bin\Release\SecurityGuard\Updater\</OutputPath>
     <DefineConstants>TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
@@ -34,13 +34,21 @@
   <ItemGroup>
     <Reference Include="System" />
     <Reference Include="System.Core" />
+    <Reference Include="System.Drawing" />
     <Reference Include="System.IO.Compression" />
     <Reference Include="System.IO.Compression.FileSystem" />
     <Reference Include="System.ServiceProcess" />
+    <Reference Include="System.Windows.Forms" />
+    <Reference Include="DevExpress.Data.v20.1" />
+    <Reference Include="DevExpress.Utils.v20.1" />
+    <Reference Include="DevExpress.XtraEditors.v20.1" />
+    <Reference Include="DevExpress.BonusSkins.v20.1" />
   </ItemGroup>
   <ItemGroup>
     <Compile Include="NativeMethods.cs" />
     <Compile Include="PipeClient.cs" />
+    <Compile Include="UpdateEngine.cs" />
+    <Compile Include="MainForm.cs" />
     <Compile Include="Program.cs" />
   </ItemGroup>
   <ItemGroup>
