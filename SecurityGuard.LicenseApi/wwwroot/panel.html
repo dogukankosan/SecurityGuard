@@ -300,8 +300,10 @@ async function detail(id,tab,ev){
       chip(r.ServiceReady?'kurulum tamam':'kurulum eksik',r.ServiceReady?'ok':'warn'),
       (r.CriticalEvents24h>0?chip(r.CriticalEvents24h+' kritik (24s)','crit'):''),
     ].join('');
-    const secMap={events:'Olaylar',rdp:'RDP',backup:'Yedekler',ports:'Portlar',security:'Güvenlik',performance:'Performans',sql:'SQL',services:'Servisler'};
+    const secMap={events:'Olaylar',backup:'Yedekler',ports:'Portlar',security:'Güvenlik',performance:'Performans',sql:'SQL',services:'Servisler'};
+    window._rdpF={from:dInput(Date.now()-7*864e5),to:dInput(Date.now()),user:''};
     const tabs=[{k:'ozet',t:'Özet'}];
+    if(rep&&rep.Rdp)tabs.push({k:'rdp',t:'RDP',c:rep.Rdp.length});
     if(rep&&rep.Sections)rep.Sections.forEach(s=>tabs.push({k:s.Key,t:secMap[s.Key]||s.Title.split(' (')[0],c:(s.Rows||[]).length}));
     tabs.push({k:'bilgi',t:'Bilgi'});
     $('#modal').innerHTML=
@@ -319,6 +321,7 @@ async function detail(id,tab,ev){
 }
 function showTab(k){
   const {r,rep}=window._D||{};let h='';
+  if(k==='rdp'){ showRdp(); return; }
   if(k==='ozet'){
     const p=rep&&rep.Dashboard;
     if(p){
@@ -360,6 +363,49 @@ function sevClass(v){v=(v==null?'':v).toString();
 function chip(t,c){return t?`<span class="chip ${c?'c-'+c:''}">${esc(t)}</span>`:''}
 function kv(k,v){if(v==null||v==='')v='-';return`<div class="k">${k}</div><div>${esc(v)}</div>`}
 function closeModal(){$('#ov').classList.remove('open');}
+
+/* ---- RDP sekmesi (tarih filtresi + toplam süre) ---- */
+function dInput(ms){const d=new Date(ms),p=n=>String(n).padStart(2,'0');return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate());}
+function fmtDur(s){ s=+s||0; if(s<=0)return'0dk'; const d=Math.floor(s/86400),h=Math.floor(s%86400/3600),m=Math.floor(s%3600/60); if(d>0)return d+'g '+h+'sa'; if(h>0)return h+'sa '+m+'dk'; return m+'dk'; }
+function rdpFiltered(){
+  const D=window._D||{}, list=(D.rep&&D.rep.Rdp)||[], f=window._rdpF||{};
+  const fromMs=f.from?Date.parse(f.from+'T00:00:00'):0, toMs=f.to?Date.parse(f.to+'T23:59:59'):Date.now()+864e5;
+  const u=(f.user||'').trim().toLowerCase();
+  return list.filter(r=>{const t=Date.parse(r.Start); if(!isNaN(t)&&(t<fromMs||t>toMs))return false; if(u&&!(((r.User||'')+'').toLowerCase().includes(u)))return false; return true;});
+}
+function showRdp(){
+  const D=window._D||{}, f=window._rdpF||{}, rows=rdpFiltered();
+  const wh=(D.rep&&D.rep.WorkHours)||'';
+  const byUser={}; rows.forEach(r=>byUser[r.User]=(byUser[r.User]||0)+(+r.DurationSeconds||0));
+  const totals=Object.keys(byUser).map(u=>({u,s:byUser[u]})).sort((a,b)=>b.s-a.s);
+  const open=rows.filter(r=>r.State==='Açık'||r.State==='Bağlantı kopuk').length, off=rows.filter(r=>r.OffHours).length;
+  let h=`<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px">
+    <span class="mut">Başlangıç</span><input type="date" id="rf" value="${f.from||''}" style="width:150px">
+    <span class="mut">Bitiş</span><input type="date" id="rt" value="${f.to||''}" style="width:150px">
+    <input id="ru" placeholder="Kullanıcı" value="${esc(f.user||'')}" style="width:140px">
+    <button class="btn" id="rapply">Listele</button>
+    <button class="ghost" onclick="exportRdp()">📊 Excel'e aktar</button></div>`;
+  if(wh)h+=`<div class="mut" style="margin-bottom:8px">Genel mesai: ${esc(wh)} · <span class="warn">turuncu</span> = mesai dışı</div>`;
+  h+=`<div style="margin-bottom:10px"><b>${rows.length}</b> oturum · şu an açık <b>${open}</b> · mesai dışı <b class="${off?'warn':''}">${off}</b>`+
+     (totals.length?`<br><span class="mut">Kullanıcı başına toplam süre:</span> ${totals.slice(0,10).map(t=>`<b>${esc(t.u)}</b> ${fmtDur(t.s)}`).join(' · ')}`:'')+`</div>`;
+  if(!rows.length)h+='<div class="msg">Seçili aralıkta oturum yok.</div>';
+  else{
+    h+='<div class="tablewrap"><div class="scroll"><table><thead><tr><th>Başlangıç</th><th>Bitiş</th><th>Kullanıcı</th><th>IP</th><th>Ülke</th><th>Durum</th><th>Süre</th><th>Mesai dışı</th></tr></thead><tbody>';
+    for(const r of rows){const on=r.State==='Açık'||r.State==='Bağlantı kopuk';
+      h+=`<tr><td style="color:${r.OffHours?'var(--orange)':(on?'var(--green)':'')}">${fmtDT(r.Start)}</td><td>${r.End?fmtDT(r.End):'<span class="mut">—</span>'}</td><td>${esc(r.User)}</td><td>${esc(r.Ip)}</td><td>${esc(r.Country)}</td><td>${esc(r.State)}</td><td>${fmtDur(r.DurationSeconds)}${on?' <span class="mut">(sürüyor)</span>':''}</td><td class="${r.OffHours?'warn':''}">${r.OffHours?'Evet':''}</td></tr>`;}
+    h+='</tbody></table></div></div>';
+  }
+  $('#tabc').innerHTML=h;
+  $('#rapply').onclick=()=>{window._rdpF={from:$('#rf').value,to:$('#rt').value,user:$('#ru').value};showRdp();};
+  $('#ru').onkeydown=e=>{if(e.key==='Enter')$('#rapply').click();};
+}
+function exportRdp(){
+  const D=window._D||{}, cust=(D.r&&D.r.CustomerName)||'musteri', rows=rdpFiltered();
+  const head=['Başlangıç','Bitiş','Kullanıcı','IP','Ülke','Durum','Süre','Mesai dışı'];
+  const data=rows.map(r=>[fmtDT(r.Start),r.End?fmtDT(r.End):'',r.User,r.Ip,r.Country,r.State,fmtDur(r.DurationSeconds),r.OffHours?'Evet':'']);
+  if(!data.length){alert('Kayıt yok.');return;}
+  dl('SecurityGuard_'+cust.replace(/[^\wğüşiöçĞÜŞİÖÇ ]/g,'')+'_rdp.xls',[head,...data]);
+}
 
 function dl(name,rows){
   const ex=s=>(s==null?'':String(s)).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));

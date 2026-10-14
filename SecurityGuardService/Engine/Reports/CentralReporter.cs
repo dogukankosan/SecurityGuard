@@ -7,6 +7,7 @@ using System.Linq;
 using System.Net;
 using System.Text;
 using System.Threading;
+using SecurityGuard.Shared;
 using SecurityGuard.Shared.Contracts;
 using SecurityGuard.Shared.Dto;
 using SecurityGuard.Shared.Enums;
@@ -162,8 +163,8 @@ namespace SecurityGuardService.Engine.Reports
         {
             var rep = new AgentReportDto();
             try { rep.Dashboard = Dashboard.Build(_g); } catch (Exception ex) { AppLog.Debug(Module, "dashboard: " + ex.Message); }
+            BuildRdp(rep);
             AddSafe(rep, EventsSection);
-            AddSafe(rep, RdpSection);
             AddSafe(rep, BackupSection);
             AddSafe(rep, PortsSection);
             AddSafe(rep, () => ChecksSection(CheckScopes.Security, "Güvenlik önerileri", "security"));
@@ -198,13 +199,33 @@ namespace SecurityGuardService.Engine.Reports
             return s;
         }
 
-        private ReportSection RdpSection()
+        /// <summary>RDP/konsol oturum geçmişi (son 30 gün, yapısal): panelde tarih filtresi + toplam süre için ISO zaman + saniye.</summary>
+        private void BuildRdp(AgentReportDto rep)
         {
-            var res = _g.RdpSessions.List(new RdpSessionQuery { IncludeConsole = true });
-            var s = new ReportSection { Key = "rdp", Title = "RDP / konsol oturumları", Note = res.WorkHours, Columns = { "Başlangıç", "Kullanıcı", "IP", "Ülke", "Durum", "Süre", "Mesai dışı" } };
-            foreach (var x in res.Rows.Take(50))
-                s.Rows.Add(new List<string> { Local(x.StartUtc), x.User, x.ClientIp, x.Country, x.State, Dur(x.DurationSeconds), x.OffHours ? "evet" : "" });
-            return s;
+            try
+            {
+                var res = _g.RdpSessions.List(new RdpSessionQuery { IncludeConsole = true, FromUtc = UtcTime.ToText(DateTime.UtcNow.AddDays(-30)) });
+                rep.WorkHours = res.WorkHours;
+                rep.Rdp = res.Rows.Take(500).Select(x => new RdpRow
+                {
+                    Start = Iso(x.StartUtc),
+                    End = Iso(x.EndUtc),
+                    User = x.User,
+                    Ip = x.Ips ?? x.ClientIp,
+                    Country = x.Country,
+                    State = x.State,
+                    DurationSeconds = x.DurationSeconds,
+                    OffHours = x.OffHours
+                }).ToList();
+            }
+            catch (Exception ex) { AppLog.Debug(Module, "rdp: " + ex.Message); }
+        }
+
+        private static string Iso(string dbTime)
+        {
+            if (string.IsNullOrEmpty(dbTime)) return null;
+            try { return DbTime.FromDb(dbTime).ToString("yyyy-MM-dd'T'HH:mm:ss'Z'", CultureInfo.InvariantCulture); }
+            catch { return dbTime; }
         }
 
         private ReportSection BackupSection()
@@ -333,6 +354,24 @@ namespace SecurityGuardService.Engine.Reports
     {
         public DashboardDto Dashboard { get; set; }
         public List<ReportSection> Sections { get; set; } = new List<ReportSection>();
+
+        /// <summary>RDP/konsol oturum geçmişi (son 30 gün, yapısal): panel tarih filtresi + toplam süre için.</summary>
+        public List<RdpRow> Rdp { get; set; }
+        /// <summary>Genel mesai tanımı (ör. "Hafta içi 08:00–19:00").</summary>
+        public string WorkHours { get; set; }
+    }
+
+    /// <summary>Panel RDP sekmesi için tek oturum (zamanlar ISO UTC; süre saniye).</summary>
+    public sealed class RdpRow
+    {
+        public string Start { get; set; }
+        public string End { get; set; }
+        public string User { get; set; }
+        public string Ip { get; set; }
+        public string Country { get; set; }
+        public string State { get; set; }
+        public long DurationSeconds { get; set; }
+        public bool OffHours { get; set; }
     }
 
     /// <summary>UI'daki bir sayfanın tablo hali: başlık + sütunlar + satırlar (her satır sütun sayısı kadar hücre).</summary>
