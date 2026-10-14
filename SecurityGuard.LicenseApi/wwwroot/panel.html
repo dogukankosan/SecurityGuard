@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>SecurityGuard — Merkezi Panel</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%232563eb'/%3E%3Ctext x='50' y='52' font-size='60' text-anchor='middle' dominant-baseline='central'%3E%F0%9F%9B%A1%3C/text%3E%3C/svg%3E">
 <style>
   :root{
     --bg:#eef1f6; --bg2:#e4e9f1; --panel:#ffffff; --panel2:#f6f8fc; --line:#e4e8f0;
@@ -221,6 +222,7 @@ function visibleRows(){
   else if(FILTER==='off')rows=rows.filter(r=>!online(r));
   else if(FILTER==='exp')rows=rows.filter(r=>{const d=daysLeft(r.ExpiresUtc);return d!=null&&d<=14;});
   else if(FILTER==='issues')rows=rows.filter(r=>r._sev>0);
+  else if(FILTER==='crit')rows=rows.filter(r=>(r.CriticalEvents24h||0)>0);
   rows.sort((a,b)=>{let x=a[SORT.k],y=b[SORT.k];if(SORT.k==='ExpiresUtc'||SORT.k==='LastHeartbeatUtc'){x=pUtc(x)||0;y=pUtc(y)||0;}x=x==null?'':x;y=y==null?'':y;let c=(x>y?1:x<y?-1:0)*SORT.dir; if(c===0&&SORT.k==='_sev')c=(a.CriticalEvents24h||0)>(b.CriticalEvents24h||0)?-1:1; return c;});
   return rows;
 }
@@ -231,22 +233,23 @@ function render(){
   const expSoon=ROWS.filter(r=>{const d=daysLeft(r.ExpiresUtc);return d!=null&&d<=14;}).length;
   const probl=ROWS.filter(r=>r._sev>0).length;
   $('#cards').innerHTML=[
-    card('🖥️',ROWS.length,'Müşteri (aktif lisans)',''),
-    card('🟢',on,'Çevrimiçi','ok'),
-    card('⚪',off,'Çevrimdışı',off>0?'warnc':''),
-    card('🔴',crit,'24s kritik olay',crit>0?'hot':''),
+    card('🖥️',ROWS.length,'Müşteri (aktif lisans)','','all'),
+    card('🟢',on,'Çevrimiçi','ok','on'),
+    card('⚪',off,'Çevrimdışı',off>0?'warnc':'','off'),
+    card('🔴',crit,'24s kritik olay',crit>0?'hot':'','crit'),
     card('🚫',bans,'24s yeni ban',bans>0?'warnc':''),
-    card('⏳',expSoon,'Lisansı bitiyor (≤14g)',expSoon>0?'warnc':''),
+    card('⏳',expSoon,'Lisansı bitiyor (≤14g)',expSoon>0?'warnc':'','exp'),
   ].join('');
   $('#updated').textContent='son güncelleme '+(LASTOK?LASTOK.toLocaleTimeString('tr-TR'):'-');
+  $$('#cards [data-filter]').forEach(cd=>cd.onclick=()=>setFilter(cd.dataset.filter));
 
   // dikkat şeridi
   const prob=ROWS.filter(r=>r._sev>0).sort((a,b)=>b._sev-a._sev||(b.CriticalEvents24h||0)-(a.CriticalEvents24h||0));
   if(prob.length){
     $('#alerts').style.display='block';
     $('#alerts').innerHTML=`<h3>⚠ Dikkat gerektiren <span class="badge ${prob.some(r=>r._sev>=3)?'hot':''}">${prob.length}</span></h3><div class="grid">`+
-      prob.slice(0,12).map(r=>{const is=issues(r).sort((a,b)=>b.lvl-a.lvl);return`<div class="alert l${r._sev}" data-id="${r.LicenseId}"><div class="m">${esc(r.CustomerName)} <span class="hdot" style="color:${hcolor(r._sev)}"></span></div><div class="r">${esc(r.MachineName)||'-'} · ${is.map(i=>`<span class="${i.lvl>=3?'crit':'warn'}">${esc(i.t)}</span>`).join(' · ')}</div></div>`;}).join('')+'</div>';
-    $$('#alerts .alert').forEach(a=>a.onclick=()=>detail(a.dataset.id));
+      prob.slice(0,12).map(r=>{const is=issues(r).sort((a,b)=>b.lvl-a.lvl);const ev=(r.CriticalEvents24h||0)>0?'events':'';return`<div class="alert l${r._sev}" data-id="${r.LicenseId}" data-ev="${ev}"><div class="m">${esc(r.CustomerName)} <span class="hdot" style="color:${hcolor(r._sev)}"></span></div><div class="r">${esc(r.MachineName)||'-'} · ${is.map(i=>`<span class="${i.lvl>=3?'crit':'warn'}">${esc(i.t)}</span>`).join(' · ')}</div></div>`;}).join('')+'</div>';
+    $$('#alerts .alert').forEach(a=>a.onclick=()=>detail(a.dataset.id, a.dataset.ev||'ozet', a.dataset.ev==='events'?'crit':'all'));
   } else $('#alerts').style.display='none';
 
   const rows=visibleRows();
@@ -268,7 +271,7 @@ function render(){
       `<td>${seen?'<span class="mut">?</span>':yn(r.ProtectionOk)}</td>`+
       `<td>${seen?'<span class="mut">?</span>':yn(r.SqlMonitoring)}</td>`+
       `<td>${seen?'<span class="mut">-</span>':r.BannedIps}</td>`+
-      `<td>${seen?'<span class="mut">-</span>':(r.CriticalEvents24h>0?`<span class="badge hot">${r.CriticalEvents24h}</span>`:'0')}</td>`+
+      `<td>${seen?'<span class="mut">-</span>':(r.CriticalEvents24h>0?`<span class="badge hot" style="cursor:pointer" title="Kritik olayları gör" onclick="event.stopPropagation();detail(${r.LicenseId},'events','crit')">${r.CriticalEvents24h}</span>`:'0')}</td>`+
       `<td>${r.MemoryMb?r.MemoryMb+' MB':'<span class="mut">-</span>'}</td>`+
       `<td class="mut">${esc(r.AgentVersion)||'-'}</td>`+
       `<td class="${isOn?'':'warn'}">${fmtAge(r.LastHeartbeatUtc)}</td></tr>`;
@@ -278,14 +281,15 @@ function render(){
   $$('th[data-k]').forEach(th=>th.onclick=()=>{const k=th.dataset.k;SORT.dir=(SORT.k===k)?-SORT.dir:(k==='_sev'||k==='CriticalEvents24h'||k==='BannedIps'||k==='MemoryMb'?-1:1);SORT.k=k;render();});
   $$('tbody tr').forEach(tr=>tr.onclick=()=>detail(tr.dataset.id));
 }
-function card(ico,n,l,c){return`<div class="card ${c}"><span class="ico">${ico}</span><div class="n">${n}</div><div class="l">${l}</div></div>`}
+function card(ico,n,l,c,f){return`<div class="card ${c}" ${f?`data-filter="${f}" style="cursor:pointer"`:''}><span class="ico">${ico}</span><div class="n">${n}</div><div class="l">${l}</div></div>`}
 function yn(b){return b?'<span class="ok">✓</span>':'<span class="crit">✕</span>'}
+function setFilter(f){FILTER=f;$$('#filters button').forEach(x=>x.classList.toggle('on',x.dataset.f===f));render();const el=$('#toolbar');if(el)el.scrollIntoView({behavior:'smooth',block:'start'});}
 
-async function detail(id){
+async function detail(id,tab,ev){
   try{
     const r=await api('/api/v1/admin/panel/agents/'+id);
     let rep=null;if(r.Payload){try{rep=JSON.parse(r.Payload)}catch{}}
-    window._D={r,rep};
+    window._D={r,rep}; window._evf=ev||'all';
     const d=daysLeft(r.ExpiresUtc),isOn=online(r);
     const chips=[
       `<span class="pill ${isOn?'on':'off'}"><span class="d"></span>${isOn?'çevrimiçi':'çevrimdışı'}</span>`,
@@ -306,8 +310,9 @@ async function detail(id){
       `<div class="statusrow">${chips}</div>`+
       `<div class="tabs" id="tabs">${tabs.map((t,i)=>`<button data-k="${t.k}" class="${i?'':'on'}">${esc(t.t)}${t.c?` <span class="cnt">${t.c}</span>`:''}</button>`).join('')}</div>`+
       `<div class="mbody"><div id="tabc"></div></div>`;
-    $$('#tabs button').forEach(b=>b.onclick=()=>{$$('#tabs button').forEach(x=>x.classList.remove('on'));b.classList.add('on');showTab(b.dataset.k);});
-    showTab('ozet');
+    const open=tab||'ozet';
+    $$('#tabs button').forEach(b=>{b.onclick=()=>{$$('#tabs button').forEach(x=>x.classList.remove('on'));b.classList.add('on');if(b.dataset.k!=='events')window._evf='all';showTab(b.dataset.k);};b.classList.toggle('on',b.dataset.k===open);});
+    showTab(open);
     $('#ov').classList.add('open');
   }catch(e){alert(e);}
 }
@@ -327,14 +332,21 @@ function showTab(k){
       kv('Bellek',r.MemoryMb?r.MemoryMb+' MB':'-')+kv('Bekleyen mail',r.PendingMail)+kv('Not',r.Note)+'</div>';
   }else h=renderTable((rep&&rep.Sections||[]).find(s=>s.Key===k));
   $('#tabc').innerHTML=h;
+  $$('#tabc [data-ef]').forEach(b=>b.onclick=()=>{window._evf=b.dataset.ef;showTab('events');});
 }
 function renderTable(sec){
   if(!sec)return'<div class="msg">Veri yok.</div>';
   const note=sec.Note?`<div class="mut" style="margin-bottom:10px">${esc(sec.Note)}</div>`:'';
-  if(!sec.Rows||!sec.Rows.length)return note+'<div class="msg">Kayıt yok. 🎉</div>';
-  let h=note+`<div style="margin-bottom:9px"><button class="ghost" onclick='exportSection(${JSON.stringify(sec.Key)})'>📊 Excel'e aktar</button></div>`+
-    '<div class="tablewrap"><div class="scroll"><table><thead><tr>'+sec.Columns.map(c=>`<th>${esc(c)}</th>`).join('')+'</tr></thead><tbody>';
-  for(const row of sec.Rows)h+='<tr>'+row.map(c=>`<td class="${sevClass(c)}">${esc(c)}</td>`).join('')+'</tr>';
+  let rows=sec.Rows||[], chips='';
+  if(sec.Key==='events'){
+    const f=window._evf||'all';
+    chips='<div class="seg" style="margin-right:auto">'+[['all','Tümü'],['crit','🔴 Kritik'],['warn','Uyarı']].map(([k,t])=>`<button data-ef="${k}" class="${f===k?'on':''}">${t}</button>`).join('')+'</div>';
+    if(f==='crit')rows=rows.filter(r=>r[1]==='Kritik'); else if(f==='warn')rows=rows.filter(r=>r[1]==='Uyarı');
+  }
+  const bar=`<div style="display:flex;gap:8px;align-items:center;margin-bottom:9px">${chips}<button class="ghost" onclick='exportSection(${JSON.stringify(sec.Key)})'>📊 Excel'e aktar</button></div>`;
+  if(!rows.length)return note+bar+'<div class="msg">Kayıt yok. 🎉</div>';
+  let h=note+bar+'<div class="tablewrap"><div class="scroll"><table><thead><tr>'+sec.Columns.map(c=>`<th>${esc(c)}</th>`).join('')+'</tr></thead><tbody>';
+  for(const row of rows)h+='<tr>'+row.map(c=>`<td class="${sevClass(c)}">${esc(c)}</td>`).join('')+'</tr>';
   return h+'</tbody></table></div></div>';
 }
 function sevClass(v){v=(v==null?'':v).toString();
@@ -347,8 +359,14 @@ function kv(k,v){if(v==null||v==='')v='-';return`<div class="k">${k}</div><div>$
 function closeModal(){$('#ov').classList.remove('open');}
 
 function dl(name,rows){
-  const csv=rows.map(r=>r.map(c=>{c=c==null?'':String(c);return/[";\n]/.test(c)?'"'+c.replace(/"/g,'""')+'"':c;}).join(';')).join('\r\n');
-  const blob=new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'});
+  const ex=s=>(s==null?'':String(s)).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+  let t='<tr>'+rows[0].map(c=>`<th>${ex(c)}</th>`).join('')+'</tr>';
+  for(let i=1;i<rows.length;i++)t+='<tr>'+rows[i].map(c=>`<td>${ex(c)}</td>`).join('')+'</tr>';
+  const html='<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="utf-8">'+
+    '<!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet><x:Name>SecurityGuard</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions></x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]-->'+
+    '<style>table{border-collapse:collapse}td,th{border:1px solid #bbb;padding:4px 9px;mso-number-format:"\\@";font-family:Calibri,Arial;font-size:11pt}th{background:#dce6f1;font-weight:bold}</style></head>'+
+    '<body><table>'+t+'</table></body></html>';
+  const blob=new Blob(['\uFEFF'+html],{type:'application/vnd.ms-excel;charset=utf-8'});
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),2000);
 }
 function exportGrid(){
@@ -356,13 +374,13 @@ function exportGrid(){
   const rows=visibleRows().map(r=>{const d=daysLeft(r.ExpiresUtc);return[r.CustomerName,r.MachineName,online(r)?'Çevrimiçi':'Çevrimdışı',d==null?'':d,fmtDate(r.ExpiresUtc),
     r.LastHeartbeatUtc==null?'?':(r.ProtectionOk?'açık':'kapalı'),r.LastHeartbeatUtc==null?'?':(r.SqlMonitoring?'evet':'hayır'),
     r.BannedIps??'',r.NewBans24h??'',r.FailedLogins24h??'',r.CriticalEvents24h??'',r.MemoryMb||'',r.PendingMail??'',r.AgentVersion,fmtDT(r.LastHeartbeatUtc),r.HwId];});
-  dl('SecurityGuard_musteriler_'+new Date().toISOString().slice(0,10)+'.csv',[head,...rows]);
+  dl('SecurityGuard_musteriler_'+new Date().toISOString().slice(0,10)+'.xls',[head,...rows]);
 }
 function exportSection(key){
   const D=window._D||{};const rep=D.rep,cust=(D.r&&D.r.CustomerName)||'musteri';
   const sec=rep&&rep.Sections&&rep.Sections.find(s=>s.Key===key);
   if(!sec||!sec.Rows.length){alert('Kayıt yok.');return;}
-  dl('SecurityGuard_'+cust.replace(/[^\wğüşiöçĞÜŞİÖÇ ]/g,'')+'_'+key+'.csv',[sec.Columns,...sec.Rows]);
+  dl('SecurityGuard_'+cust.replace(/[^\wğüşiöçĞÜŞİÖÇ ]/g,'')+'_'+key+'.xls',[sec.Columns,...sec.Rows]);
 }
 
 $('#go').onclick=load;$('#refresh').onclick=load;$('#theme').onclick=cycleTheme;$('#excel').onclick=exportGrid;
