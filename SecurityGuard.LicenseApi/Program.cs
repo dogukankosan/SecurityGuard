@@ -103,6 +103,8 @@ if (adminKeys.Count > 0 && !adminAccess.Restricted)
 if (adminKeys.Count > 0 && !adminAccess.RequireHttps)
     app.Logger.LogWarning("Admin:RequireHttps kapalı: yönetici anahtarı (X-Admin-Key) HTTP ile düz metin gidebilir. HTTPS kurup Admin:RequireHttps=true yapın.");
 
+app.UseDefaultFiles();
+app.UseStaticFiles(); // wwwroot/panel.html → merkezi web paneli (admin anahtarıyla, HTTPS 5443 üzerinden)
 app.UseRateLimiter();
 if (swagger)
 {

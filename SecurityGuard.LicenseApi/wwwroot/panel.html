@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SecurityGuard — Merkezi Panel</title>
+<style>
+  :root{
+    --bg:#0f1115; --panel:#171a21; --panel2:#1e222b; --line:#2a2f3a; --text:#e7eaf0; --muted:#9aa3b2;
+    --green:#2ecc71; --orange:#f39c12; --red:#e74c3c; --blue:#3498db; --gray:#6b7280;
+    --accent:#4a9eff;
+  }
+  @media (prefers-color-scheme: light){
+    :root{ --bg:#f3f5f8; --panel:#ffffff; --panel2:#f7f9fc; --line:#e2e6ee; --text:#1a1f29; --muted:#5b6472; --accent:#2563eb; }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font:14px/1.45 "Segoe UI",system-ui,Arial,sans-serif}
+  header{display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:14px 18px;border-bottom:1px solid var(--line);background:var(--panel);position:sticky;top:0;z-index:5}
+  header h1{font-size:18px;margin:0;font-weight:650;display:flex;align-items:center;gap:8px}
+  .dot{width:10px;height:10px;border-radius:50%;display:inline-block}
+  .grow{flex:1}
+  input,button{font:inherit;color:var(--text);background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px 10px;outline:none}
+  input:focus{border-color:var(--accent)}
+  button{cursor:pointer;background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+  button.ghost{background:var(--panel2);color:var(--text)}
+  .wrap{padding:16px 18px;max-width:1500px;margin:0 auto}
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:16px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+  .card .n{font-size:24px;font-weight:700}
+  .card .l{color:var(--muted);font-size:12px;margin-top:2px}
+  table{width:100%;border-collapse:collapse;background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+  th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);white-space:nowrap}
+  th{background:var(--panel2);color:var(--muted);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.03em;cursor:pointer;user-select:none}
+  tbody tr{cursor:pointer}
+  tbody tr:hover{background:var(--panel2)}
+  td.cust{font-weight:600;white-space:normal}
+  .pill{display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px;font-weight:600}
+  .ok{color:var(--green)} .warn{color:var(--orange)} .crit{color:var(--red)} .mut{color:var(--muted)}
+  .bg-ok{background:rgba(46,204,113,.15);color:var(--green)} .bg-off{background:rgba(107,114,128,.18);color:var(--gray)}
+  .bg-crit{background:rgba(231,76,60,.15);color:var(--red)} .bg-warn{background:rgba(243,156,18,.15);color:var(--orange)}
+  .msg{padding:40px;text-align:center;color:var(--muted)}
+  /* detay */
+  .ov{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;align-items:flex-start;justify-content:center;padding:30px 16px;overflow:auto;z-index:10}
+  .ov.open{display:flex}
+  .modal{background:var(--panel);border:1px solid var(--line);border-radius:14px;max-width:1000px;width:100%;padding:18px 20px}
+  .modal h2{margin:0 0 2px;font-size:18px}
+  .modal .sub{color:var(--muted);font-size:13px;margin-bottom:14px}
+  .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin-bottom:16px}
+  .tile{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;border-left:4px solid var(--gray)}
+  .tile.l1{border-left-color:var(--blue)} .tile.l2{border-left-color:var(--orange)} .tile.l3{border-left-color:var(--red)}
+  .tile .t{color:var(--muted);font-size:12px} .tile .v{font-weight:700;font-size:16px;margin:2px 0} .tile .d{color:var(--muted);font-size:12px}
+  .evrow{display:flex;gap:10px;padding:7px 0;border-bottom:1px solid var(--line);font-size:13px}
+  .evrow .ti{color:var(--muted);min-width:120px}
+  .close{float:right;background:var(--panel2);color:var(--text);border:1px solid var(--line)}
+  .err{color:var(--red);padding:10px 14px}
+</style>
+</head>
+<body>
+<header>
+  <h1><span class="dot bg-ok" style="background:var(--green)"></span> SecurityGuard — Merkezi Panel</h1>
+  <span class="grow"></span>
+  <input id="q" placeholder="Müşteri / makine ara…" style="width:200px">
+  <input id="key" type="password" placeholder="Yönetici anahtarı" style="width:220px">
+  <button id="go">Bağlan</button>
+  <button id="refresh" class="ghost" title="Yenile">↻</button>
+</header>
+<div class="wrap">
+  <div class="cards" id="cards"></div>
+  <div id="err" class="err" style="display:none"></div>
+  <div id="content"><div class="msg">Yönetici anahtarını girip <b>Bağlan</b>'a bas.</div></div>
+</div>
+
+<div class="ov" id="ov"><div class="modal" id="modal"></div></div>
+
+<script>
+const $ = s => document.querySelector(s);
+const OFFLINE_MIN = 8;           // son heartbeat bundan eskiyse çevrimdışı
+let AUTO = null, SORT = {k:null,dir:1}, ROWS = [];
+
+function keyGet(){ try{return sessionStorage.getItem('sgkey')||''}catch{return ''} }
+function keySet(v){ try{sessionStorage.setItem('sgkey',v)}catch{} }
+
+async function api(path){
+  const r = await fetch(path, {headers:{'X-Admin-Key':$('#key').value.trim()}});
+  if(r.status===401) throw 'Yönetici anahtarı kabul edilmedi (401).';
+  if(r.status===403) throw 'HTTPS zorunlu ya da IP izinli değil (403). Paneli https:// (5443) üzerinden açın.';
+  if(r.status===404) throw 'Erişim yok (404): IP izin listesinde değilsiniz.';
+  if(!r.ok) throw 'Sunucu hatası: '+r.status;
+  return r.json();
+}
+
+function ageMin(utc){ if(!utc) return Infinity; const t=Date.parse(utc.endsWith('Z')?utc:utc+'Z'); return (Date.now()-t)/60000; }
+function fmtAge(utc){
+  if(!utc) return 'hiç';
+  const m=ageMin(utc);
+  if(m<1) return 'az önce'; if(m<60) return Math.floor(m)+' dk önce';
+  if(m<1440) return Math.floor(m/60)+' sa önce'; return Math.floor(m/1440)+' gün önce';
+}
+function daysLeft(exp){ if(!exp) return null; return Math.ceil((Date.parse(exp.endsWith('Z')?exp:exp+'Z')-Date.now())/86400000); }
+function esc(s){ return (s==null?'':String(s)).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+async function load(){
+  const key=$('#key').value.trim();
+  if(!key){ $('#content').innerHTML='<div class="msg">Yönetici anahtarını girip <b>Bağlan</b>\'a bas.</div>'; return; }
+  keySet(key);
+  $('#err').style.display='none';
+  try{
+    ROWS = await api('/api/v1/admin/panel/agents');
+    render();
+    if(!AUTO) AUTO=setInterval(load, 30000);
+  }catch(e){
+    $('#err').textContent=e; $('#err').style.display='block';
+    if(AUTO){clearInterval(AUTO);AUTO=null;}
+  }
+}
+
+function online(r){ return r.LastHeartbeatUtc && ageMin(r.LastHeartbeatUtc) < OFFLINE_MIN; }
+
+function render(){
+  const q=$('#q').value.trim().toLowerCase();
+  let rows=ROWS.filter(r=>!q || (r.CustomerName||'').toLowerCase().includes(q) || (r.MachineName||'').toLowerCase().includes(q) || (r.HwId||'').toLowerCase().includes(q));
+  if(SORT.k){ rows.sort((a,b)=>{let x=a[SORT.k],y=b[SORT.k]; x=x==null?'':x; y=y==null?'':y; return (x>y?1:x<y?-1:0)*SORT.dir;}); }
+
+  const on=ROWS.filter(online).length, off=ROWS.length-on;
+  const crit=ROWS.reduce((s,r)=>s+(r.CriticalEvents24h||0),0);
+  const bans=ROWS.reduce((s,r)=>s+(r.NewBans24h||0),0);
+  const expSoon=ROWS.filter(r=>{const d=daysLeft(r.ExpiresUtc);return d!=null&&d<=14;}).length;
+  $('#cards').innerHTML=[
+    card(ROWS.length,'Müşteri (aktif lisans)'),
+    card(on,'Çevrimiçi','ok'),
+    card(off,'Çevrimdışı', off>0?'warn':'mut'),
+    card(crit,'24s kritik olay', crit>0?'crit':'ok'),
+    card(bans,'24s yeni ban', bans>0?'warn':'mut'),
+    card(expSoon,'Lisansı bitiyor (≤14g)', expSoon>0?'warn':'mut'),
+  ].join('');
+
+  if(rows.length===0){ $('#content').innerHTML='<div class="msg">Kayıt yok.</div>'; return; }
+  const h=(k,t)=>`<th data-k="${k}">${t}</th>`;
+  let html='<table><thead><tr>'+
+    h('CustomerName','Müşteri')+h('MachineName','Makine')+'<th>Durum</th>'+
+    h('ExpiresUtc','Lisans')+'<th>Koruma</th><th>SQL</th>'+
+    h('BannedIps','Ban')+h('CriticalEvents24h','24s Kritik')+h('MemoryMb','Bellek')+
+    h('AgentVersion','Sürüm')+h('LastHeartbeatUtc','Son görülme')+'</tr></thead><tbody>';
+  for(const r of rows){
+    const isOn=online(r), d=daysLeft(r.ExpiresUtc);
+    const lic = d==null?'<span class="mut">-</span>' : d<0?'<span class="crit">doldu</span>' : d<=14?`<span class="warn">${d} gün</span>`:`<span class="ok">${d} gün</span>`;
+    html+=`<tr data-id="${r.LicenseId}">`+
+      `<td class="cust">${esc(r.CustomerName)}</td>`+
+      `<td>${esc(r.MachineName)||'<span class="mut">-</span>'}</td>`+
+      `<td><span class="pill ${isOn?'bg-ok':'bg-off'}">${isOn?'çevrimiçi':'çevrimdışı'}</span></td>`+
+      `<td>${lic}</td>`+
+      `<td>${r.LastHeartbeatUtc==null?'<span class="mut">?</span>':badge(r.ProtectionOk)}</td>`+
+      `<td>${r.LastHeartbeatUtc==null?'<span class="mut">?</span>':badge(r.SqlMonitoring)}</td>`+
+      `<td>${r.BannedIps??'<span class="mut">-</span>'}</td>`+
+      `<td>${(r.CriticalEvents24h>0)?`<span class="crit">${r.CriticalEvents24h}</span>`:(r.CriticalEvents24h??'<span class="mut">-</span>')}</td>`+
+      `<td>${r.MemoryMb?r.MemoryMb+' MB':'<span class="mut">-</span>'}</td>`+
+      `<td class="mut">${esc(r.AgentVersion)||'-'}</td>`+
+      `<td class="${isOn?'':'warn'}">${fmtAge(r.LastHeartbeatUtc)}</td>`+
+      `</tr>`;
+  }
+  html+='</tbody></table>';
+  $('#content').innerHTML=html;
+  document.querySelectorAll('th[data-k]').forEach(th=>th.onclick=()=>{const k=th.dataset.k; SORT.dir=(SORT.k===k)?-SORT.dir:1; SORT.k=k; render();});
+  document.querySelectorAll('tbody tr').forEach(tr=>tr.onclick=()=>detail(tr.dataset.id));
+}
+function card(n,l,cls){ return `<div class="card"><div class="n ${cls||''}">${n}</div><div class="l">${l}</div></div>`; }
+function badge(b){ return b?'<span class="ok">✓</span>':'<span class="crit">✕</span>'; }
+
+async function detail(id){
+  try{
+    const r=await api('/api/v1/admin/panel/agents/'+id);
+    let tiles='', events='';
+    if(r.Payload){
+      try{
+        const p=JSON.parse(r.Payload);
+        (p.Tiles||[]).forEach(t=>{ tiles+=`<div class="tile l${t.Level||0}"><div class="t">${esc(t.Title)}</div><div class="v">${esc(t.Value)}</div><div class="d">${esc(t.Detail)}</div></div>`; });
+        (p.RecentEvents||[]).slice(0,15).forEach(e=>{ const c=e.Severity>=2?'crit':e.Severity==1?'warn':'mut'; events+=`<div class="evrow"><span class="ti">${esc(localTime(e.TimeUtc))}</span><span class="${c}">${esc(e.Name)}</span><span>${esc(e.Summary)}</span></div>`; });
+      }catch{}
+    }
+    const d=daysLeft(r.ExpiresUtc);
+    $('#modal').innerHTML=
+      `<button class="close" onclick="$('#ov').classList.remove('open')">Kapat</button>`+
+      `<h2>${esc(r.CustomerName)}</h2>`+
+      `<div class="sub">${esc(r.MachineName)||'-'} · ${esc(r.HwId)} · sürüm ${esc(r.AgentVersion)||'?'} · son görülme ${fmtAge(r.LastHeartbeatUtc)}`+
+      ` · lisans ${d==null?'-':d<0?'doldu':d+' gün'} · ${r.ServiceReady?'kurulum tamam':'kurulum eksik'}</div>`+
+      (tiles?`<div class="tiles">${tiles}</div>`:'<div class="msg">Bu ajandan henüz detaylı anlık görüntü gelmedi.</div>')+
+      (events?`<h3 style="margin:8px 0">Son olaylar</h3>${events}`:'');
+    $('#ov').classList.add('open');
+  }catch(e){ alert(e); }
+}
+function localTime(s){ if(!s) return ''; const t=new Date(s.endsWith('Z')?s:s+'Z'); return isNaN(t)?s:t.toLocaleString('tr-TR'); }
+
+$('#go').onclick=load;
+$('#refresh').onclick=load;
+$('#q').oninput=()=>render();
+$('#key').onkeydown=e=>{ if(e.key==='Enter') load(); };
+$('#ov').onclick=e=>{ if(e.target.id==='ov') $('#ov').classList.remove('open'); };
+// kayıtlı anahtar varsa otomatik bağlan
+$('#key').value=keyGet();
+if(keyGet()) load();
+</script>
+</body>
+</html>
