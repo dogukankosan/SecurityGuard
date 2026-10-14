@@ -1,5 +1,7 @@
 using System;
 using System.Drawing;
+using System.IO;
+using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using DevExpress.XtraEditors;
@@ -21,14 +23,16 @@ namespace SecurityGuardUpdater
         private readonly MarqueeProgressBarControl _marquee = new MarqueeProgressBarControl { Visible = false };
         private readonly LabelControl _status = new LabelControl();
         private readonly MemoEdit _log = new MemoEdit();
+        private readonly string _logFile = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "update.log");
 
         public MainForm()
         {
             Text = "SecurityGuard — Merkezi Güncelleme";
             Icon = SafeIcon();
             StartPosition = FormStartPosition.CenterScreen;
+            FormBorderStyle = FormBorderStyle.FixedSingle;  // sabit boyut
+            MaximizeBox = false;                            // büyütme yok
             ClientSize = new Size(560, 480);
-            MinimumSize = new Size(480, 420);
             Build();
             _engine.Log = s => BeginInvoke((Action)(() => AppendLog(s)));
             _engine.Percent = p => BeginInvoke((Action)(() => SetPercent(p)));
@@ -57,6 +61,7 @@ namespace SecurityGuardUpdater
             var lp = new LabelControl { Text = "Şifre", Location = new Point(14, 58) };
             _pass.Location = new Point(110, 55); _pass.Width = 200; _pass.Properties.UseSystemPasswordChar = true;
             _check.Location = new Point(325, 40); _check.Size = new Size(190, 30);
+            _check.Cursor = Cursors.Hand;
             _check.Click += async (s, e) => await CheckAsync();
             _pass.KeyDown += async (s, e) => { if (e.KeyCode == Keys.Enter) await CheckAsync(); };
             group.Controls.AddRange(new Control[] { lu, _user, lp, _pass, _check });
@@ -75,6 +80,7 @@ namespace SecurityGuardUpdater
             _apply.Size = new Size(120, 40);
             _apply.Appearance.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
             _apply.Appearance.Options.UseFont = true;
+            _apply.Cursor = Cursors.Hand;
             _apply.Click += async (s, e) => await ApplyAsync();
             Controls.Add(_apply);
 
@@ -110,7 +116,7 @@ namespace SecurityGuardUpdater
             catch (Exception ex)
             {
                 _info.Text = "";
-                Fail(ex.Message);
+                LogException(ex);
                 EnableLogin(false);
             }
         }
@@ -138,7 +144,7 @@ namespace SecurityGuardUpdater
                     AppendLog("Yeni sürüm bulundu: " + m.Version + " (" + Math.Max(1, m.SizeBytes / 1024 / 1024) + " MB). İndirme ve doğrulama 'Güncelle' ile başlar.");
                 }
             }
-            catch (Exception ex) { Fail(ex.Message); }
+            catch (Exception ex) { LogException(ex); }
             finally { Busy(false, ""); }
         }
 
@@ -159,7 +165,7 @@ namespace SecurityGuardUpdater
             }
             catch (Exception ex)
             {
-                Fail(ex.Message);
+                LogException(ex);
                 XtraMessageBox.Show(this, "Güncelleme başarısız:\r\n" + ex.Message, "SecurityGuard", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
             finally { Busy(false, ""); _check.Enabled = true; }
@@ -171,8 +177,18 @@ namespace SecurityGuardUpdater
         {
             _check.Enabled = !busy;
             _status.Text = status;
-            if (busy) { if (_bar.Visible == false) SetPercent(-1); Cursor = Cursors.WaitCursor; }
-            else { Cursor = Cursors.Default; }
+            Cursor = busy ? Cursors.WaitCursor : Cursors.Default;
+            if (busy) SetPercent(-1);   // işlem başladı → belirsiz çubuk döner
+            else StopProgress();        // işlem bitti → çubuk durur
+        }
+
+        /// <summary>İşlem bitince ilerleme göstergesini durdurur (marquee gizlenir; başarı için %100 çubuğu kalır).</summary>
+        private void StopProgress()
+        {
+            _marquee.Visible = false;
+            bool completed = false;
+            try { completed = _bar.Visible && Convert.ToInt32(_bar.EditValue ?? 0) >= 100; } catch { }
+            if (!completed) _bar.Visible = false;
         }
 
         private void SetPercent(int p)
@@ -188,9 +204,17 @@ namespace SecurityGuardUpdater
 
         private void AppendLog(string s)
         {
-            _log.Text += (_log.Text.Length > 0 ? "\r\n" : "") + DateTime.Now.ToString("HH:mm:ss") + "  " + s;
+            string line = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + "  " + s;
+            _log.Text += (_log.Text.Length > 0 ? "\r\n" : "") + line;
             _log.SelectionStart = _log.Text.Length;
             _log.ScrollToCaret();
+            try { File.AppendAllText(_logFile, line + "\r\n", Encoding.UTF8); } catch { }
+        }
+
+        private void LogException(Exception ex)
+        {
+            Fail(ex.Message);
+            try { File.AppendAllText(_logFile, "  >> " + ex + "\r\n", Encoding.UTF8); } catch { }
         }
 
         private void Result(string text, Color color)
