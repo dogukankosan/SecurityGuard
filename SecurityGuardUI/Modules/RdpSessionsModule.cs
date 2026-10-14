@@ -27,7 +27,9 @@ namespace SecurityGuardUI.Modules
         private readonly DateEdit _to = new DateEdit { Width = 110 };
         private readonly TextEdit _user = new TextEdit { Width = 150 };
         private readonly CheckEdit _offOnly = new CheckEdit { Width = 130 };
+        private readonly CheckEdit _activeOnly = new CheckEdit { Width = 150 };
         private readonly CheckEdit _console = new CheckEdit { Width = 170, Checked = true };
+        private RdpSessionResult _last;
         private readonly LabelControl _work = new LabelControl();
         private readonly LabelControl _status = new LabelControl();
 
@@ -69,6 +71,9 @@ namespace SecurityGuardUI.Modules
             add("Kullanıcı", _user, 150);
             _offOnly.Properties.Caption = "Sadece mesai dışı";
             add(null, _offOnly, 130);
+            _activeOnly.Properties.Caption = "Sadece şu an bağlı";
+            _activeOnly.CheckedChanged += (s, e) => { if (_last != null) Bind(_last); };
+            add(null, _activeOnly, 150);
             _console.Properties.Caption = "Konsol girişlerini göster";
             add(null, _console, 170);
             var list = new SimpleButton { Text = "Listele", Size = new Size(80, 26) };
@@ -126,16 +131,24 @@ namespace SecurityGuardUI.Modules
             if (result != null) Bind(result);
         }
 
+        private static bool IsActive(RdpSessionDto r)
+        {
+            return r.State == "Açık" || r.State == "Bağlantı kopuk";
+        }
+
         private void Bind(RdpSessionResult result)
         {
-            _grid.DataSource = result.Rows.Select(r => new Row(r)).ToList();
+            _last = result;
+            var rows = _activeOnly.Checked ? result.Rows.Where(IsActive).ToList() : result.Rows;
+            _grid.DataSource = rows.Select(r => new Row(r)).ToList();
             _view.BestFitColumns();
-            _work.Text = "Genel mesai: " + result.WorkHours + " (değiştirmek için Genel Ayarlar → Mesai saatleri). Turuncu satırlar mesai dışı.";
+            _work.Text = "Genel mesai: " + result.WorkHours + " (değiştirmek için Genel Ayarlar → Mesai saatleri). Turuncu satırlar mesai dışı, yeşil = şu an bağlı.";
 
-            var perUser = result.Rows.GroupBy(r => r.User).Select(g => new { User = g.Key, Seconds = g.Sum(r => r.DurationSeconds), Count = g.Count() })
+            var perUser = rows.GroupBy(r => r.User).Select(g => new { User = g.Key, Seconds = g.Sum(r => r.DurationSeconds), Count = g.Count() })
                 .OrderByDescending(u => u.Seconds).ToList();
-            _status.Text = result.Rows.Count + " oturum" + (result.Truncated ? " (ilk 5000; aralığı daraltın)" : "")
-                           + ", mesai dışı: " + result.Rows.Count(r => r.OffHours) + ", şu an açık: " + result.Rows.Count(r => r.State == "Açık" || r.State == "Bağlantı kopuk")
+            _status.Text = rows.Count + " oturum" + (result.Truncated ? " (ilk 5000; aralığı daraltın)" : "")
+                           + (_activeOnly.Checked ? " (sadece şu an bağlı)" : "")
+                           + ", mesai dışı: " + rows.Count(r => r.OffHours) + ", şu an bağlı: " + rows.Count(IsActive)
                            + (perUser.Count == 0 ? "" : ".  Kullanıcı başına süre: " + string.Join(", ", perUser.Take(8).Select(u => u.User + " " + Duration(u.Seconds) + " (" + u.Count + ")")));
         }
 

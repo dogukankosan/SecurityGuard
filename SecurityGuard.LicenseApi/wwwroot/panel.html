@@ -371,7 +371,8 @@ function rdpFiltered(){
   const D=window._D||{}, list=(D.rep&&D.rep.Rdp)||[], f=window._rdpF||{};
   const fromMs=f.from?Date.parse(f.from+'T00:00:00'):0, toMs=f.to?Date.parse(f.to+'T23:59:59'):Date.now()+864e5;
   const u=(f.user||'').trim().toLowerCase();
-  return list.filter(r=>{const t=Date.parse(r.Start); if(!isNaN(t)&&(t<fromMs||t>toMs))return false; if(u&&!(((r.User||'')+'').toLowerCase().includes(u)))return false; return true;});
+  const act=r=>r.State==='Açık'||r.State==='Bağlantı kopuk';
+  return list.filter(r=>{const t=Date.parse(r.Start); if(!isNaN(t)&&(t<fromMs||t>toMs))return false; if(u&&!(((r.User||'')+'').toLowerCase().includes(u)))return false; if(f.active&&!act(r))return false; return true;});
 }
 function showRdp(){
   const D=window._D||{}, f=window._rdpF||{}, rows=rdpFiltered();
@@ -383,6 +384,7 @@ function showRdp(){
     <span class="mut">Başlangıç</span><input type="date" id="rf" value="${f.from||''}" style="width:150px">
     <span class="mut">Bitiş</span><input type="date" id="rt" value="${f.to||''}" style="width:150px">
     <input id="ru" placeholder="Kullanıcı" value="${esc(f.user||'')}" style="width:140px">
+    <label class="mut" style="display:flex;align-items:center;gap:5px"><input type="checkbox" id="ra" ${f.active?'checked':''} style="width:auto;padding:0"> Sadece şu an bağlı</label>
     <button class="btn" id="rapply">Listele</button>
     <button class="ghost" onclick="exportRdp()">📊 Excel'e aktar</button></div>`;
   if(wh)h+=`<div class="mut" style="margin-bottom:8px">Genel mesai: ${esc(wh)} · <span class="warn">turuncu</span> = mesai dışı</div>`;
@@ -396,7 +398,8 @@ function showRdp(){
     h+='</tbody></table></div></div>';
   }
   $('#tabc').innerHTML=h;
-  $('#rapply').onclick=()=>{window._rdpF={from:$('#rf').value,to:$('#rt').value,user:$('#ru').value};showRdp();};
+  $('#rapply').onclick=()=>{window._rdpF={from:$('#rf').value,to:$('#rt').value,user:$('#ru').value,active:$('#ra').checked};showRdp();};
+  $('#ra').onchange=()=>$('#rapply').click();
   $('#ru').onkeydown=e=>{if(e.key==='Enter')$('#rapply').click();};
 }
 function exportRdp(){
