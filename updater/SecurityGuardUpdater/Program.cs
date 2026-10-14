@@ -57,12 +57,15 @@ namespace SecurityGuardUpdater
         {
             bool auto = args.Any(a => string.Equals(a, "--yes", StringComparison.OrdinalIgnoreCase) || a == "-y");
 
-            string root = AppDomain.CurrentDomain.BaseDirectory.TrimEnd('\\');
+            string root = ResolveRoot();
             string serviceDir = Path.Combine(root, "Service");
             string uiDir = Path.Combine(root, "UI");
             string serviceExe = Path.Combine(serviceDir, "SecurityGuardService.exe");
             if (!File.Exists(serviceExe))
-                throw new UpdateException("SecurityGuard kurulumu bulunamadı. Bu program kurulum kökünde (Service ve UI klasörlerinin yanında) olmalı.\r\n  Aranan: " + serviceExe);
+            {
+                string self = AppDomain.CurrentDomain.BaseDirectory.TrimEnd('\\');
+                throw new UpdateException("SecurityGuard kurulumu bulunamadı. Bu program kurulum kökünde ya da kök altındaki Updater klasöründe olmalı (Service ve UI klasörleriyle aynı kurulumda).\r\n  Bakılan: " + Path.Combine(self, "Service") + "\r\n           " + serviceExe);
+            }
 
             using (var pipe = new PipeClient(serviceExe))
             {
@@ -161,6 +164,16 @@ namespace SecurityGuardUpdater
                 try { Directory.Delete(work, true); } catch { }
                 Pause();
             }
+        }
+
+        /// <summary>Kurulum kökünü bulur: önce exe'nin kendi klasörü, sonra bir üstü (Updater alt klasöründeyse).</summary>
+        private static string ResolveRoot()
+        {
+            string dir = AppDomain.CurrentDomain.BaseDirectory.TrimEnd('\\');
+            if (File.Exists(Path.Combine(dir, "Service", "SecurityGuardService.exe"))) return dir;
+            string parent = Path.GetDirectoryName(dir);
+            if (parent != null && File.Exists(Path.Combine(parent, "Service", "SecurityGuardService.exe"))) return parent;
+            return dir;
         }
 
         // ================================================================ Hub

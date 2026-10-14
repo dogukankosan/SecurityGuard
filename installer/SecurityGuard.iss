@@ -42,12 +42,12 @@ Name: "tr"; MessagesFile: "compiler:Languages\Turkish.isl"
 Source: "{#SrcRoot}\Service\*"; DestDir: "{app}\Service"; Flags: recursesubdirs ignoreversion; Excludes: "*.pdb"
 ; Arayüz klasörü (DevExpress + UI + SgAutoTest)
 Source: "{#SrcRoot}\UI\*"; DestDir: "{app}\UI"; Flags: recursesubdirs ignoreversion; Excludes: "*.pdb"
-; Merkezi güncelleme aracı (kurulum kökünde; Service/UI değiştirilirken kilitlenmesin diye kökte durur)
-Source: "{#SrcRoot}\SecurityGuardUpdater.exe"; DestDir: "{app}"; Flags: ignoreversion
+; Merkezi güncelleme aracı (kök altındaki Updater klasöründe; Service/UI değiştirilirken kilitlenmez)
+Source: "{#SrcRoot}\SecurityGuardUpdater.exe"; DestDir: "{app}\Updater"; Flags: ignoreversion
 
 [Icons]
 Name: "{group}\SecurityGuard"; Filename: "{app}\UI\{#UiExe}"
-Name: "{group}\SecurityGuard Güncelle"; Filename: "{app}\SecurityGuardUpdater.exe"
+Name: "{group}\SecurityGuard Güncelle"; Filename: "{app}\Updater\SecurityGuardUpdater.exe"
 Name: "{commondesktop}\SecurityGuard"; Filename: "{app}\UI\{#UiExe}"; Tasks: desktopicon
 
 [Tasks]
