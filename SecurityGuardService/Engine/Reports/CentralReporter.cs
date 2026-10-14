@@ -149,6 +149,8 @@ namespace SecurityGuardService.Engine.Reports
                 CriticalEvents24h = (int)counts[3],
                 MemoryMb = memMb,
                 PendingMail = (int)counts[4],
+                AvailableVersion = _g.Update.AvailableVersion,
+                UpdateReady = _g.Update.Ready,
                 Payload = payload
             };
         }
@@ -319,6 +321,10 @@ namespace SecurityGuardService.Engine.Reports
         public int CriticalEvents24h { get; set; }
         public int MemoryMb { get; set; }
         public int PendingMail { get; set; }
+        /// <summary>Mevcut sürümden yeni, kurulabilir sürüm (yoksa boş).</summary>
+        public string AvailableVersion { get; set; }
+        /// <summary>Yeni sürüm indirildi + doğrulandı, panelden onaya hazır.</summary>
+        public bool UpdateReady { get; set; }
         public string Payload { get; set; }
     }
 

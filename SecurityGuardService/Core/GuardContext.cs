@@ -16,6 +16,7 @@ using SecurityGuardService.Engine.Firewall;
 using SecurityGuardService.Engine.Health;
 using SecurityGuardService.Engine.Reports;
 using SecurityGuardService.Engine.Rules;
+using SecurityGuardService.Engine.Update;
 using SecurityGuardService.Licensing;
 using SecurityGuardService.Mail;
 using SecurityGuardService.Sql;
@@ -80,10 +81,14 @@ namespace SecurityGuardService.Core
             MonthlyReports = new MonthlyReport(this);
             Watch = new SystemWatch(database, settings, Events);
             Central = new CentralReporter(this);
+            Update = new Updater(this);
         }
 
         /// <summary>Merkezi panele durum bildirimi (heartbeat, outbound; varsayılan açık).</summary>
         public CentralReporter Central { get; private set; }
+
+        /// <summary>Merkezi versiyon güncelleme (Faz A: kontrol + indir + doğrula; uygulama Faz B).</summary>
+        public Updater Update { get; private set; }
 
         /// <summary>Lisans doğrulama; geçerli değilse izleme / koruma durur (LicenseGate).</summary>
         public LicenseManager License { get; private set; }
@@ -208,6 +213,7 @@ namespace SecurityGuardService.Core
                 context.MonthlyReports.Start();
                 context.Watch.Start();
                 context.Central.Start();
+                context.Update.Start();
                 return context;
             }
             catch
@@ -312,6 +318,14 @@ namespace SecurityGuardService.Core
             catch (Exception ex)
             {
                 AppLog.Error(Module, "Port kısıtı nöbeti durdurulamadı.", ex);
+            }
+            try
+            {
+                if (Update != null) Update.Dispose();
+            }
+            catch (Exception ex)
+            {
+                AppLog.Error(Module, "Güncelleme kontrolü durdurulamadı.", ex);
             }
             try
             {

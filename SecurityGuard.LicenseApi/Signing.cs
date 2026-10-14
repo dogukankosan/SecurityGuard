@@ -40,6 +40,12 @@ public sealed class Signing : IDisposable
         response.Signature = Convert.ToBase64String(_rsa.SignData(data, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1));
     }
 
+    public void Sign(UpdateManifest manifest)
+    {
+        byte[] data = Encoding.UTF8.GetBytes(LicenseProtocol.Canonical(manifest));
+        manifest.Signature = Convert.ToBase64String(_rsa.SignData(data, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1));
+    }
+
     /// <summary>Yeni RSA 3072 anahtarı üretir, şifreli yazar; açık anahtarı döner. Var olan dosyanın üzerine yazmaz.</summary>
     public static (string Modulus, string Exponent) Generate(string keyFile)
     {

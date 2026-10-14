@@ -82,6 +82,7 @@ public sealed class LicenseRepository(IConfiguration config)
             MachineName = Trim(r.MachineName, 64),
             r.ServiceReady, r.LicenseValid, r.ProtectionOk, r.SqlMonitoring,
             r.BannedIps, r.NewBans24h, r.FailedLogins24h, r.CriticalEvents24h, r.MemoryMb, r.PendingMail,
+            AvailableVersion = Trim(r.AvailableVersion, 32), r.UpdateReady,
             r.Payload
         }, commandType: CommandType.StoredProcedure, commandTimeout: 15);
     }
@@ -189,6 +190,8 @@ public sealed class HeartbeatRequest
     public int CriticalEvents24h { get; set; }
     public int MemoryMb { get; set; }
     public int PendingMail { get; set; }
+    public string? AvailableVersion { get; set; }
+    public bool UpdateReady { get; set; }
     /// <summary>Detay sayfası için tam JSON anlık görüntü (opsiyonel).</summary>
     public string? Payload { get; set; }
 }
@@ -214,6 +217,8 @@ public sealed class PanelAgentRow
     public int? CriticalEvents24h { get; set; }
     public int? MemoryMb { get; set; }
     public int? PendingMail { get; set; }
+    public string? AvailableVersion { get; set; }
+    public bool? UpdateReady { get; set; }
 }
 
 /// <summary>Panel detay: lisans + güncel ajan durumu + tam JSON anlık görüntü.</summary>
@@ -241,5 +246,7 @@ public sealed class PanelAgentDetailRow
     public int? CriticalEvents24h { get; set; }
     public int? MemoryMb { get; set; }
     public int? PendingMail { get; set; }
+    public string? AvailableVersion { get; set; }
+    public bool? UpdateReady { get; set; }
     public string? Payload { get; set; }
 }

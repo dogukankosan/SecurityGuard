@@ -223,6 +223,7 @@ function visibleRows(){
   else if(FILTER==='exp')rows=rows.filter(r=>{const d=daysLeft(r.ExpiresUtc);return d!=null&&d<=14;});
   else if(FILTER==='issues')rows=rows.filter(r=>r._sev>0);
   else if(FILTER==='crit')rows=rows.filter(r=>(r.CriticalEvents24h||0)>0);
+  else if(FILTER==='upd')rows=rows.filter(r=>r.AvailableVersion);
   rows.sort((a,b)=>{let x=a[SORT.k],y=b[SORT.k];if(SORT.k==='ExpiresUtc'||SORT.k==='LastHeartbeatUtc'){x=pUtc(x)||0;y=pUtc(y)||0;}x=x==null?'':x;y=y==null?'':y;let c=(x>y?1:x<y?-1:0)*SORT.dir; if(c===0&&SORT.k==='_sev')c=(a.CriticalEvents24h||0)>(b.CriticalEvents24h||0)?-1:1; return c;});
   return rows;
 }
@@ -231,14 +232,14 @@ function render(){
   const on=ROWS.filter(online).length, off=ROWS.length-on;
   const crit=ROWS.reduce((s,r)=>s+(r.CriticalEvents24h||0),0), bans=ROWS.reduce((s,r)=>s+(r.NewBans24h||0),0);
   const expSoon=ROWS.filter(r=>{const d=daysLeft(r.ExpiresUtc);return d!=null&&d<=14;}).length;
-  const probl=ROWS.filter(r=>r._sev>0).length;
+  const upd=ROWS.filter(r=>r.AvailableVersion).length;
   $('#cards').innerHTML=[
     card('🖥️',ROWS.length,'Müşteri (aktif lisans)','','all'),
     card('🟢',on,'Çevrimiçi','ok','on'),
     card('⚪',off,'Çevrimdışı',off>0?'warnc':'','off'),
     card('🔴',crit,'24s kritik olay',crit>0?'hot':'','crit'),
-    card('🚫',bans,'24s yeni ban',bans>0?'warnc':''),
     card('⏳',expSoon,'Lisansı bitiyor (≤14g)',expSoon>0?'warnc':'','exp'),
+    card('⬆️',upd,'Güncellenebilir',upd>0?'warnc':'','upd'),
   ].join('');
   $('#updated').textContent='son güncelleme '+(LASTOK?LASTOK.toLocaleTimeString('tr-TR'):'-');
   $$('#cards [data-filter]').forEach(cd=>cd.onclick=()=>setFilter(cd.dataset.filter));
@@ -273,7 +274,7 @@ function render(){
       `<td>${seen?'<span class="mut">-</span>':r.BannedIps}</td>`+
       `<td>${seen?'<span class="mut">-</span>':(r.CriticalEvents24h>0?`<span class="badge hot" style="cursor:pointer" title="Kritik olayları gör" onclick="event.stopPropagation();detail(${r.LicenseId},'events','crit')">${r.CriticalEvents24h}</span>`:'0')}</td>`+
       `<td>${r.MemoryMb?r.MemoryMb+' MB':'<span class="mut">-</span>'}</td>`+
-      `<td class="mut">${esc(r.AgentVersion)||'-'}</td>`+
+      `<td class="mut">${esc(r.AgentVersion)||'-'}${r.AvailableVersion?` <span class="chip c-warn" title="${r.UpdateReady?'İndirildi, onay bekliyor':'İndiriliyor'}">⬆ ${esc(r.AvailableVersion)}${r.UpdateReady?' ✓':''}</span>`:''}</td>`+
       `<td class="${isOn?'':'warn'}">${fmtAge(r.LastHeartbeatUtc)}</td></tr>`;
   }
   h+='</tbody></table></div></div>';
@@ -329,7 +330,9 @@ function showTab(k){
     h='<div class="kv">'+kv('Müşteri',r.CustomerName)+kv('Makine',r.MachineName)+kv('Donanım kimliği',r.HwId)+
       kv('Ajan sürümü',r.AgentVersion)+kv('Lisans bitiş',fmtDate(r.ExpiresUtc)+(d!=null?` (${d<0?'doldu':d+' gün'})`:''))+
       kv('Son heartbeat',fmtDT(r.LastHeartbeatUtc))+kv('Lisans son doğrulama',fmtDT(r.LastSeenUtc))+kv('Son IP',r.LastIp)+
-      kv('Bellek',r.MemoryMb?r.MemoryMb+' MB':'-')+kv('Bekleyen mail',r.PendingMail)+kv('Not',r.Note)+'</div>';
+      kv('Bellek',r.MemoryMb?r.MemoryMb+' MB':'-')+kv('Bekleyen mail',r.PendingMail)+
+      kv('Güncelleme',r.AvailableVersion?(r.AvailableVersion+(r.UpdateReady?' — indirildi, onay bekliyor':' — indiriliyor')):'güncel')+
+      kv('Not',r.Note)+'</div>';
   }else h=renderTable((rep&&rep.Sections||[]).find(s=>s.Key===k));
   $('#tabc').innerHTML=h;
   $$('#tabc [data-ef]').forEach(b=>b.onclick=()=>{window._evf=b.dataset.ef;showTab('events');});

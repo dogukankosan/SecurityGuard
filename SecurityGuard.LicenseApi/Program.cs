@@ -52,6 +52,7 @@ builder.Services.AddSingleton<LicenseRepository>();
 builder.Services.AddSingleton(sp => new Signing(KeyFilePath(sp.GetRequiredService<IConfiguration>())));
 builder.Services.AddSingleton<AdminKey>();
 builder.Services.AddSingleton<AdminAccess>();
+builder.Services.AddSingleton<UpdateCatalog>();
 builder.Services.AddHostedService<PurgeService>();
 
 int validatePerMinute = builder.Configuration.GetValue("RateLimit:ValidatePerMinute", 30);
@@ -160,6 +161,25 @@ app.MapPost("/api/v1/agent/heartbeat", async (HeartbeatRequest? req, LicenseRepo
 .RequireRateLimiting("validate")
 .WithTags("İstemci")
 .WithSummary("Ajanın periyodik durum bildirimi (merkezi panel).");
+
+// ---- İstemci: güncelleme (imzalı manifest + paket) ----
+app.MapGet("/" + LicenseProtocol.UpdatePath, (HttpContext ctx, UpdateCatalog cat, Signing sign) =>
+{
+    var m = cat.Build(sign, ctx.Request.Scheme + "://" + ctx.Request.Host.Value);
+    return m == null ? Results.NoContent() : Results.Ok(m); // tanımlı değilse güncelleme yok
+})
+.RequireRateLimiting("validate")
+.WithTags("İstemci")
+.WithSummary("En son sürüm manifesti (RSA imzalı).");
+
+app.MapGet("/" + LicenseProtocol.UpdatePath + "/package", (UpdateCatalog cat) =>
+{
+    var f = cat.PackageFile;
+    return f == null || !f.Exists ? Results.NotFound() : Results.File(f.FullName, "application/zip", "SecurityGuard-" + cat.Version + ".zip");
+})
+.RequireRateLimiting("validate")
+.WithTags("İstemci")
+.WithSummary("Güncelleme paketi (zip). Bütünlüğü manifest SHA-256 ile doğrulanır.");
 
 // ---- Yönetici ----
 var admin = app.MapGroup("/api/v1/admin").AddEndpointFilter<AdminKeyFilter>().RequireRateLimiting("admin").WithTags("Yönetici");
@@ -373,6 +393,54 @@ public sealed class AdminAccess
         if (rem == 0) return true;
         int mask = (0xFF << (8 - rem)) & 0xFF;
         return (a[full] & mask) == (b[full] & mask);
+    }
+}
+
+/// <summary>
+/// Güncelleme kataloğu: config'teki en son sürüm + paket dosyasından imzalı manifest üretir.
+/// SHA-256 dosya değişene kadar önbelleğe alınır; manifest her istekte (Url + zaman ile) imzalanır.
+/// Update:Version veya Update:PackagePath boşsa / dosya yoksa güncelleme tanımlı değildir (manifest null).
+/// </summary>
+public sealed class UpdateCatalog(IConfiguration config)
+{
+    private readonly object _lock = new();
+    private string _path = ""; private DateTime _write; private long _size; private string _sha = "";
+
+    public string Version => (config["Update:Version"] ?? "").Trim();
+    public string PackagePath => (config["Update:PackagePath"] ?? "").Trim();
+    public bool Configured => Version.Length > 0 && PackagePath.Length > 0 && File.Exists(PackagePath);
+    public FileInfo PackageFile => Configured ? new FileInfo(PackagePath) : null;
+
+    public UpdateManifest Build(Signing signing, string baseUrl)
+    {
+        if (!Configured) return null;
+        var fi = new FileInfo(PackagePath);
+        string sha; long size;
+        lock (_lock)
+        {
+            if (_path == PackagePath && _write == fi.LastWriteTimeUtc && _size == fi.Length) { sha = _sha; size = _size; }
+            else
+            {
+                using (var s = File.OpenRead(PackagePath))
+                using (var h = SHA256.Create())
+                    sha = Convert.ToHexString(h.ComputeHash(s));
+                size = fi.Length;
+                _path = PackagePath; _write = fi.LastWriteTimeUtc; _size = size; _sha = sha;
+            }
+        }
+        var m = new UpdateManifest
+        {
+            Version = Version,
+            Sha256 = sha,
+            SizeBytes = size,
+            Url = baseUrl.TrimEnd('/') + "/" + LicenseProtocol.UpdatePath + "/package",
+            Mandatory = config.GetValue("Update:Mandatory", false),
+            MinVersion = (config["Update:MinVersion"] ?? "").Trim(),
+            ServerTimeUtc = LicenseProtocol.FormatTime(DateTime.UtcNow),
+            Notes = config["Update:Notes"]
+        };
+        signing.Sign(m);
+        return m;
     }
 }
 

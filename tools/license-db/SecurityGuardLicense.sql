@@ -339,6 +339,8 @@ BEGIN
         CriticalEvents24h int           NOT NULL CONSTRAINT DF_AgentStatus_Crit   DEFAULT (0),
         MemoryMb          int           NOT NULL CONSTRAINT DF_AgentStatus_Mem    DEFAULT (0),
         PendingMail       int           NOT NULL CONSTRAINT DF_AgentStatus_Mail   DEFAULT (0),
+        AvailableVersion  nvarchar(32)  NULL,     -- mevcut sürümden yeni, kurulabilir sürüm (yoksa NULL)
+        UpdateReady       bit           NOT NULL CONSTRAINT DF_AgentStatus_UpdRdy DEFAULT (0),
         Payload           nvarchar(max) NULL,     -- detay sayfası için tam JSON anlık görüntü
         UpdatedUtc        datetime2(0)  NOT NULL CONSTRAINT DF_AgentStatus_Upd    DEFAULT (SYSUTCDATETIME()),
         CONSTRAINT PK_AgentStatus PRIMARY KEY CLUSTERED (LicenseId),
@@ -348,6 +350,10 @@ END
 GO
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_AgentStatus_Heartbeat' AND object_id = OBJECT_ID(N'dbo.AgentStatus'))
     CREATE NONCLUSTERED INDEX IX_AgentStatus_Heartbeat ON dbo.AgentStatus (LastHeartbeatUtc DESC);
+GO
+-- Sonradan eklenen kolonlar (mevcut veritabanı için; tablo zaten varsa yoksa ekle)
+IF COL_LENGTH(N'dbo.AgentStatus', 'AvailableVersion') IS NULL ALTER TABLE dbo.AgentStatus ADD AvailableVersion nvarchar(32) NULL;
+IF COL_LENGTH(N'dbo.AgentStatus', 'UpdateReady') IS NULL ALTER TABLE dbo.AgentStatus ADD UpdateReady bit NOT NULL CONSTRAINT DF_AgentStatus_UpdRdy DEFAULT (0);
 GO
 
 -- Ajan heartbeat: SADECE aktif lisansı olan makine kabul edilir (lisanssız/iptal ajan panele düşmez).
@@ -366,6 +372,8 @@ CREATE OR ALTER PROCEDURE dbo.usp_Agent_Heartbeat
     @CriticalEvents24h int           = 0,
     @MemoryMb          int           = 0,
     @PendingMail       int           = 0,
+    @AvailableVersion  nvarchar(32)  = NULL,
+    @UpdateReady       bit           = 0,
     @Payload           nvarchar(max) = NULL
 AS
 BEGIN
@@ -380,14 +388,15 @@ BEGIN
     SET HwId = @HwId, LastHeartbeatUtc = @now, AgentVersion = @AgentVersion, MachineName = @MachineName,
         ServiceReady = @ServiceReady, LicenseValid = @LicenseValid, ProtectionOk = @ProtectionOk, SqlMonitoring = @SqlMonitoring,
         BannedIps = @BannedIps, NewBans24h = @NewBans24h, FailedLogins24h = @FailedLogins24h, CriticalEvents24h = @CriticalEvents24h,
-        MemoryMb = @MemoryMb, PendingMail = @PendingMail, Payload = @Payload, UpdatedUtc = @now
+        MemoryMb = @MemoryMb, PendingMail = @PendingMail, AvailableVersion = @AvailableVersion, UpdateReady = @UpdateReady,
+        Payload = @Payload, UpdatedUtc = @now
     WHERE LicenseId = @id;
 
     IF @@ROWCOUNT = 0
         INSERT dbo.AgentStatus (LicenseId, HwId, LastHeartbeatUtc, AgentVersion, MachineName, ServiceReady, LicenseValid, ProtectionOk, SqlMonitoring,
-                                BannedIps, NewBans24h, FailedLogins24h, CriticalEvents24h, MemoryMb, PendingMail, Payload, UpdatedUtc)
+                                BannedIps, NewBans24h, FailedLogins24h, CriticalEvents24h, MemoryMb, PendingMail, AvailableVersion, UpdateReady, Payload, UpdatedUtc)
         VALUES (@id, @HwId, @now, @AgentVersion, @MachineName, @ServiceReady, @LicenseValid, @ProtectionOk, @SqlMonitoring,
-                @BannedIps, @NewBans24h, @FailedLogins24h, @CriticalEvents24h, @MemoryMb, @PendingMail, @Payload, @now);
+                @BannedIps, @NewBans24h, @FailedLogins24h, @CriticalEvents24h, @MemoryMb, @PendingMail, @AvailableVersion, @UpdateReady, @Payload, @now);
 
     SELECT @id AS LicenseId;
 END
@@ -404,7 +413,8 @@ BEGIN
         COALESCE(a.MachineName, l.LastMachine)   AS MachineName,
         COALESCE(a.AgentVersion, l.LastVersion)  AS AgentVersion,
         a.LastHeartbeatUtc, a.ServiceReady, a.LicenseValid, a.ProtectionOk, a.SqlMonitoring,
-        a.BannedIps, a.NewBans24h, a.FailedLogins24h, a.CriticalEvents24h, a.MemoryMb, a.PendingMail
+        a.BannedIps, a.NewBans24h, a.FailedLogins24h, a.CriticalEvents24h, a.MemoryMb, a.PendingMail,
+        a.AvailableVersion, a.UpdateReady
     FROM dbo.Licenses l
     LEFT JOIN dbo.AgentStatus a ON a.LicenseId = l.LicenseId
     WHERE l.Status = 1
@@ -423,7 +433,8 @@ BEGIN
     SELECT l.LicenseId, l.HwId, l.CustomerName, l.ExpiresUtc, l.Status AS LicenseStatus, l.Note,
            l.CreatedUtc, l.LastSeenUtc, l.LastIp,
            a.LastHeartbeatUtc, a.AgentVersion, a.MachineName, a.ServiceReady, a.LicenseValid, a.ProtectionOk, a.SqlMonitoring,
-           a.BannedIps, a.NewBans24h, a.FailedLogins24h, a.CriticalEvents24h, a.MemoryMb, a.PendingMail, a.Payload
+           a.BannedIps, a.NewBans24h, a.FailedLogins24h, a.CriticalEvents24h, a.MemoryMb, a.PendingMail,
+           a.AvailableVersion, a.UpdateReady, a.Payload
     FROM dbo.Licenses l
     LEFT JOIN dbo.AgentStatus a ON a.LicenseId = l.LicenseId
     WHERE l.LicenseId = @LicenseId;

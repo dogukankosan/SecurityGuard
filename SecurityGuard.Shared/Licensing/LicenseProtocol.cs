@@ -46,10 +46,42 @@ namespace SecurityGuard.Shared.Licensing
         public string Signature { get; set; }
     }
 
+    /// <summary>
+    /// Hub → ajan: en son sürüm bilgisi. RSA (SHA-256, PKCS#1) imzalı; imza <see cref="LicenseProtocol.Canonical(UpdateManifest)"/> üzerinde.
+    /// Paketin bütünlüğü <see cref="Sha256"/> ile; manifest imzası SHA'yı güvence altına alır (paket ayrıca imzalanmaz).
+    /// </summary>
+    public sealed class UpdateManifest
+    {
+        /// <summary>En son sürüm, 4 parça (ör. 1.1.0.0). Boş / mevcut sürümle aynıysa güncelleme yok.</summary>
+        public string Version { get; set; }
+
+        /// <summary>İndirilecek paketin (zip) SHA-256'sı, büyük harf hex.</summary>
+        public string Sha256 { get; set; }
+
+        public long SizeBytes { get; set; }
+
+        /// <summary>Paketin indirme adresi (hub).</summary>
+        public string Url { get; set; }
+
+        /// <summary>Zorunlu güvenlik güncellemesi mi.</summary>
+        public bool Mandatory { get; set; }
+
+        /// <summary>Bu sürüme çıkmak için gereken en düşük mevcut sürüm (boş = kısıt yok). Downgrade / uyumsuzluk koruması.</summary>
+        public string MinVersion { get; set; }
+
+        public string ServerTimeUtc { get; set; }
+
+        /// <summary>Sürüm notu (imzaya DAHİL DEĞİL; sadece gösterim).</summary>
+        public string Notes { get; set; }
+
+        public string Signature { get; set; }
+    }
+
     public static class LicenseProtocol
     {
         public const string Version = "SGLIC1";
         public const string ValidatePath = "api/v1/license/validate";
+        public const string UpdatePath = "api/v1/agent/update";
 
         public const string StatusValid = "valid";
         public const string StatusExpired = "expired";
@@ -122,6 +154,65 @@ namespace SecurityGuard.Shared.Licensing
             {
                 return false;
             }
+        }
+
+        // ================================================================ Güncelleme manifesti
+
+        /// <summary>İmzalanan metin: güvenlik açısından önemli alanlar sabit sırada, '|' ile (Notes imzaya dahil değil).</summary>
+        public static string Canonical(UpdateManifest m)
+        {
+            return string.Join("|", new[]
+            {
+                Version, m.Version ?? "", (m.Sha256 ?? "").ToUpperInvariant(), m.SizeBytes.ToString(CultureInfo.InvariantCulture),
+                Clean(m.Url), m.Mandatory ? "1" : "0", m.MinVersion ?? "", m.ServerTimeUtc ?? ""
+            });
+        }
+
+        public static bool Verify(UpdateManifest m)
+        {
+            return Verify(m, PublicModulus, PublicExponent);
+        }
+
+        public static bool Verify(UpdateManifest m, string modulusBase64, string exponentBase64)
+        {
+            if (m == null || string.IsNullOrEmpty(m.Signature)) return false;
+            try
+            {
+                using (var rsa = RSA.Create())
+                {
+                    rsa.ImportParameters(new RSAParameters { Modulus = Convert.FromBase64String(modulusBase64), Exponent = Convert.FromBase64String(exponentBase64) });
+                    return rsa.VerifyData(Encoding.UTF8.GetBytes(Canonical(m)), Convert.FromBase64String(m.Signature), HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
+                }
+            }
+            catch (FormatException)
+            {
+                return false;
+            }
+            catch (CryptographicException)
+            {
+                return false;
+            }
+        }
+
+        /// <summary>candidate, current'tan daha yeni mi (4 parçalı sürüm; hatalı girdi = false).</summary>
+        public static bool IsNewerVersion(string current, string candidate)
+        {
+            System.Version c, n;
+            return TryVersion(current, out c) && TryVersion(candidate, out n) && n > c;
+        }
+
+        /// <summary>current, minVersion'ı karşılıyor mu (minVersion boşsa her zaman true).</summary>
+        public static bool MeetsMinVersion(string current, string minVersion)
+        {
+            if (string.IsNullOrWhiteSpace(minVersion)) return true;
+            System.Version c, m;
+            return TryVersion(current, out c) && TryVersion(minVersion, out m) && c >= m;
+        }
+
+        private static bool TryVersion(string s, out System.Version v)
+        {
+            v = null;
+            return !string.IsNullOrWhiteSpace(s) && System.Version.TryParse(s.Trim(), out v);
         }
     }
 }
