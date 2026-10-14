@@ -179,8 +179,9 @@ namespace SecurityGuardService.Engine.Reports
         }
     }
 
-    /// <summary>Ajan → hub heartbeat gövdesi (hub tarafındaki HeartbeatRequest ile aynı alan adları: PascalCase).</summary>
-    internal sealed class HeartbeatDto
+    /// <summary>Ajan → hub heartbeat gövdesi (hub tarafındaki HeartbeatRequest ile aynı alan adları: PascalCase).
+    /// public: DataContractJsonSerializer (PipeProtocol) attribute'suz POCO'yu yalnız public tipte serialize eder.</summary>
+    public sealed class HeartbeatDto
     {
         public string HwId { get; set; }
         public string AgentVersion { get; set; }
