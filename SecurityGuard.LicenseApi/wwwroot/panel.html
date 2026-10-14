@@ -82,7 +82,13 @@
   .dhead h2{margin:0;font-size:20px}
   .dhead .sub{color:var(--muted);font-size:13px;margin-top:4px}
   .dbody{padding:18px 22px}
-  .statusrow{display:flex;flex-wrap:wrap;gap:8px;margin:4px 0 18px}
+  .statusrow{display:flex;flex-wrap:wrap;gap:8px;margin:4px 0 0}
+  .tabs{display:flex;gap:2px;flex-wrap:wrap;border-bottom:1px solid var(--line);margin:0 0 16px}
+  .tabs button{background:transparent;border:0;border-bottom:2px solid transparent;border-radius:0;padding:9px 13px;color:var(--muted);font-weight:600;font-size:13px}
+  .tabs button:hover{color:var(--text)}
+  .tabs button.on{color:var(--text);border-bottom-color:var(--accent)}
+  #tabc .tablewrap{box-shadow:none}
+  #tabc th{font-size:11px}
   .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin-bottom:20px}
   .tile{background:var(--panel2);border:1px solid var(--line);border-radius:11px;padding:11px 13px;border-left:4px solid var(--gray)}
   .tile.l1{border-left-color:var(--blue)} .tile.l2{border-left-color:var(--orange)} .tile.l3{border-left-color:var(--red)}
@@ -240,40 +246,64 @@ function yn(b){return b?'<span class="ok">✓</span>':'<span class="crit">✕</s
 async function detail(id){
   try{
     const r=await api('/api/v1/admin/panel/agents/'+id);
+    let rep=null; if(r.Payload){ try{rep=JSON.parse(r.Payload)}catch{} }
+    window._D={r,rep};
     const d=daysLeft(r.ExpiresUtc), isOn=online(r);
-    let tiles='',todos='',events='',p=null;
-    if(r.Payload){ try{p=JSON.parse(r.Payload)}catch{} }
-    if(p){
-      (p.Tiles||[]).forEach(t=>{tiles+=`<div class="tile l${t.Level||0}"><div class="t">${esc(t.Title)}</div><div class="v">${esc(t.Value)}</div><div class="d">${esc(t.Detail)}</div></div>`;});
-      (p.Todos||[]).forEach(t=>{todos+=`<div class="todo l${t.Level||0}"><span class="b"></span><span>${esc(t.Text)}</span></div>`;});
-      (p.RecentEvents||[]).forEach(e=>{const c=e.Severity>=2?'crit':e.Severity==1?'warn':'mut';events+=`<div class="evt"><span class="ti">${fmtDT(e.TimeUtc)}</span><span class="nm ${c}">${esc(e.Name)}</span><span class="sm">${esc(e.Summary)}</span></div>`;});
-    }
-    const statusChips=[
+    const chips=[
       `<span class="pill ${isOn?'on':'off'}"><span class="d"></span>${isOn?'çevrimiçi':'çevrimdışı'}</span>`,
       chip(d==null?'lisans ?':d<0?'lisans doldu':'lisans '+d+' gün', d==null?'':d<0?'crit':d<=14?'warn':'ok'),
       chip('koruma '+(r.ProtectionOk?'açık':'?'), r.ProtectionOk?'ok':'warn'),
       chip('SQL '+(r.SqlMonitoring?'izleniyor':'?'), r.SqlMonitoring?'ok':'warn'),
       chip(r.ServiceReady?'kurulum tamam':'kurulum eksik', r.ServiceReady?'ok':'warn'),
     ].join('');
+    const tabs=[{k:'ozet',t:'Özet'}];
+    if(rep&&rep.Sections) rep.Sections.forEach(s=>tabs.push({k:s.Key,t:s.Title.split(' (')[0]}));
+    tabs.push({k:'bilgi',t:'Bilgi'});
     $('#drawer').innerHTML=
       `<div class="dhead"><button class="close" onclick="closeDrawer()">Kapat ✕</button>`+
-      `<h2>${esc(r.CustomerName)}</h2><div class="sub">${esc(r.MachineName)||'makine ?'} · son görülme ${fmtAge(r.LastHeartbeatUtc)}</div></div>`+
-      `<div class="dbody"><div class="statusrow">${statusChips}</div>`+
-      (tiles?`<div class="tiles">${tiles}</div>`:'<div class="msg">Bu ajandan henüz detaylı anlık görüntü gelmedi (eski sürüm olabilir).</div>')+
-      (todos?`<h3 class="sec">Dikkat edilmesi gerekenler</h3>${todos}`:'')+
-      (events?`<h3 class="sec">Son olaylar</h3>${events}<div style="margin-top:10px"><button class="ghost" onclick='exportEvents(${JSON.stringify(r.CustomerName)})'>📊 Bu olayları Excel'e aktar</button></div>`:'')+
-      `<h3 class="sec">Makine / lisans bilgisi</h3><div class="kv">`+
-        kv('Müşteri',r.CustomerName)+kv('Makine',r.MachineName)+kv('Donanım kimliği',r.HwId)+
-        kv('Ajan sürümü',r.AgentVersion)+kv('Lisans bitiş',fmtDate(r.ExpiresUtc)+(d!=null?` (${d<0?'doldu':d+' gün'})`:''))+
-        kv('Son heartbeat',fmtDT(r.LastHeartbeatUtc))+kv('Lisans son doğrulama',fmtDT(r.LastSeenUtc))+kv('Son IP',r.LastIp)+
-        kv('Bellek',r.MemoryMb?r.MemoryMb+' MB':'-')+kv('Bekleyen mail',r.PendingMail)+kv('Not',r.Note)+
-      `</div></div>`;
-    window._detailCache={r,p};
+      `<h2>${esc(r.CustomerName)}</h2><div class="sub">${esc(r.MachineName)||'makine ?'} · son görülme ${fmtAge(r.LastHeartbeatUtc)}</div>`+
+      `<div class="statusrow" style="margin-top:12px">${chips}</div></div>`+
+      `<div class="dbody"><div class="tabs" id="tabs">${tabs.map((t,i)=>`<button data-k="${t.k}" class="${i?'':'on'}">${esc(t.t)}</button>`).join('')}</div><div id="tabc"></div></div>`;
+    $$('#tabs button').forEach(b=>b.onclick=()=>{$$('#tabs button').forEach(x=>x.classList.remove('on'));b.classList.add('on');showTab(b.dataset.k);});
+    showTab('ozet');
     $('#ov').classList.add('open'); $('#drawer').classList.add('open');
   }catch(e){ alert(e); }
 }
+function showTab(k){
+  const {r,rep}=window._D||{}; let h='';
+  if(k==='ozet'){
+    const p=rep&&rep.Dashboard;
+    if(p){
+      h='<div class="tiles">'+(p.Tiles||[]).map(t=>`<div class="tile l${t.Level||0}"><div class="t">${esc(t.Title)}</div><div class="v">${esc(t.Value)}</div><div class="d">${esc(t.Detail)}</div></div>`).join('')+'</div>';
+      if((p.Todos||[]).length) h+='<h3 class="sec">Dikkat edilmesi gerekenler</h3>'+p.Todos.map(t=>`<div class="todo l${t.Level||0}"><span class="b"></span><span>${esc(t.Text)}</span></div>`).join('');
+    } else h='<div class="msg">Bu ajandan henüz detaylı anlık görüntü gelmedi (eski sürüm olabilir — ajanı güncelleyin).</div>';
+  } else if(k==='bilgi'){
+    const d=daysLeft(r.ExpiresUtc);
+    h='<div class="kv">'+kv('Müşteri',r.CustomerName)+kv('Makine',r.MachineName)+kv('Donanım kimliği',r.HwId)+
+      kv('Ajan sürümü',r.AgentVersion)+kv('Lisans bitiş',fmtDate(r.ExpiresUtc)+(d!=null?` (${d<0?'doldu':d+' gün'})`:''))+
+      kv('Son heartbeat',fmtDT(r.LastHeartbeatUtc))+kv('Lisans son doğrulama',fmtDT(r.LastSeenUtc))+kv('Son IP',r.LastIp)+
+      kv('Bellek',r.MemoryMb?r.MemoryMb+' MB':'-')+kv('Bekleyen mail',r.PendingMail)+kv('Not',r.Note)+'</div>';
+  } else {
+    h=renderTable((rep&&rep.Sections||[]).find(s=>s.Key===k));
+  }
+  $('#tabc').innerHTML=h;
+}
+function renderTable(sec){
+  if(!sec) return '<div class="msg">Veri yok.</div>';
+  if(!sec.Rows||!sec.Rows.length) return (sec.Note?`<div class="mut" style="margin-bottom:10px">${esc(sec.Note)}</div>`:'')+'<div class="msg">Kayıt yok.</div>';
+  let h=(sec.Note?`<div class="mut" style="margin-bottom:10px">${esc(sec.Note)}</div>`:'')+
+    `<div style="margin-bottom:8px"><button class="ghost" onclick='exportSection(${JSON.stringify(sec.Key)})'>📊 Excel'e aktar</button></div>`+
+    '<div class="tablewrap"><div class="scroll"><table><thead><tr>'+sec.Columns.map(c=>`<th>${esc(c)}</th>`).join('')+'</tr></thead><tbody>';
+  for(const row of sec.Rows) h+='<tr>'+row.map(c=>`<td class="${sevClass(c)}" style="white-space:normal">${esc(c)}</td>`).join('')+'</tr>';
+  return h+'</tbody></table></div></div>';
+}
+function sevClass(v){ v=(v==null?'':v).toString();
+  if(v==='Kritik'||v==='Hatalı'||v==='durmuş'||v==='evet')return'crit';
+  if(v==='Uyarı')return'warn';
+  if(v==='Bilgi'||v==='çalışıyor'||v==='Tamamlandı'||v==='açık'||v==='Geçti')return'ok';
+  return''; }
 function chip(t,c){return`<span class="chip ${c?'c-'+c:''}">${esc(t)}</span>`}
-function kv(k,v){ if(v==null||v==='')v='-'; return`<div class="k">${k}</div><div>${esc(v)}</div>`}
+function kv(k,v){ if(v==null||v==='')v='-'; return`<div class="k">${k}</div><div style="white-space:normal">${esc(v)}</div>`}
 function closeDrawer(){ $('#ov').classList.remove('open'); $('#drawer').classList.remove('open'); }
 
 /* ---- Excel (CSV, TR uyumlu: ; ayraç + UTF-8 BOM) ---- */
@@ -291,12 +321,11 @@ function exportGrid(){
     r.AgentVersion,fmtDT(r.LastHeartbeatUtc),r.HwId];});
   dl('SecurityGuard_musteriler_'+new Date().toISOString().slice(0,10)+'.csv',[head,...rows]);
 }
-function exportEvents(cust){
-  const p=window._detailCache&&window._detailCache.p; if(!p||!p.RecentEvents){alert('Olay yok.');return;}
-  const head=['Zaman','Önem','Olay','Özet'];
-  const sev=s=>s>=2?'Kritik':s==1?'Uyarı':'Bilgi';
-  const rows=p.RecentEvents.map(e=>[fmtDT(e.TimeUtc),sev(e.Severity),e.Name,e.Summary]);
-  dl('SecurityGuard_'+(cust||'musteri').replace(/[^\wğüşiöçĞÜŞİÖÇ ]/g,'')+'_olaylar.csv',[head,...rows]);
+function exportSection(key){
+  const D=window._D||{}; const rep=D.rep, cust=(D.r&&D.r.CustomerName)||'musteri';
+  const sec=rep&&rep.Sections&&rep.Sections.find(s=>s.Key===key);
+  if(!sec||!sec.Rows.length){alert('Kayıt yok.');return;}
+  dl('SecurityGuard_'+cust.replace(/[^\wğüşiöçĞÜŞİÖÇ ]/g,'')+'_'+key+'.csv',[sec.Columns,...sec.Rows]);
 }
 
 /* ---- olaylar ---- */

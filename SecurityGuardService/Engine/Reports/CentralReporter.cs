@@ -1,10 +1,17 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
+using System.Linq;
 using System.Net;
 using System.Text;
 using System.Threading;
 using SecurityGuard.Shared.Contracts;
+using SecurityGuard.Shared.Dto;
+using SecurityGuard.Shared.Enums;
+using SecurityGuardService.Checks;
+using SecurityGuardService.Checks.Security;
 using SecurityGuardService.Core;
 using SecurityGuardService.Core.Data;
 using SecurityGuardService.Core.Logging;
@@ -27,7 +34,7 @@ namespace SecurityGuardService.Engine.Reports
         private const string Module = "MerkezPanel";
         private const string Path = "api/v1/agent/heartbeat";
         private static readonly TimeSpan Interval = TimeSpan.FromMinutes(3);
-        private const int MaxPayload = 60000; // hub 65536 sınırı; altında kalalım
+        private const int MaxPayload = 400000; // zengin anlık görüntü (olaylar + RDP + yedek + port + taramalar...); hub sınırı 512 KB
 
         private readonly GuardContext _g;
         private readonly CancellationTokenSource _cts = new CancellationTokenSource();
@@ -119,8 +126,8 @@ namespace SecurityGuardService.Engine.Reports
             string payload = null;
             try
             {
-                payload = PipeProtocol.ToJson(Dashboard.Build(_g));
-                if (payload.Length > MaxPayload) payload = null; // çok büyükse sadece özet alanları gider
+                payload = BuildReport();
+                if (payload.Length > MaxPayload) payload = null; // çok büyükse sadece özet grid alanları gider
             }
             catch (Exception ex)
             {
@@ -144,6 +151,122 @@ namespace SecurityGuardService.Engine.Reports
                 PendingMail = (int)counts[4],
                 Payload = payload
             };
+        }
+
+        // ================================================================ Zengin anlık görüntü (panel detay sekmeleri)
+
+        /// <summary>UI'daki bölümlerin aynısı: özet + olaylar, RDP, yedekler, açık portlar, güvenlik/performans, SQL, servisler.</summary>
+        private string BuildReport()
+        {
+            var rep = new AgentReportDto();
+            try { rep.Dashboard = Dashboard.Build(_g); } catch (Exception ex) { AppLog.Debug(Module, "dashboard: " + ex.Message); }
+            AddSafe(rep, EventsSection);
+            AddSafe(rep, RdpSection);
+            AddSafe(rep, BackupSection);
+            AddSafe(rep, PortsSection);
+            AddSafe(rep, () => ChecksSection(CheckScopes.Security, "Güvenlik önerileri", "security"));
+            AddSafe(rep, () => ChecksSection(CheckScopes.Performance, "Performans önerileri", "performance"));
+            AddSafe(rep, SqlSection);
+            AddSafe(rep, ServicesSection);
+            return PipeProtocol.ToJson(rep);
+        }
+
+        private void AddSafe(AgentReportDto rep, Func<ReportSection> build)
+        {
+            try { var s = build(); if (s != null) rep.Sections.Add(s); }
+            catch (Exception ex) { AppLog.Debug(Module, "bölüm hazırlanamadı: " + ex.Message); }
+        }
+
+        private ReportSection EventsSection()
+        {
+            var s = new ReportSection { Key = "events", Title = "Olaylar (son 30 gün)", Columns = { "Zaman", "Önem", "Olay", "Kullanıcı / IP", "Özet" } };
+            string since = DbTime.ToDb(DateTime.UtcNow.AddDays(-30));
+            _g.Database.Read(c =>
+            {
+                using (var cmd = c.Create("SELECT TimeUtc, Severity, EventType, UserName, IpAddress, Summary FROM EventLog WHERE Severity >= 1 AND TimeUtc >= @s ORDER BY Id DESC LIMIT 120", ("@s", since)))
+                using (var r = cmd.ExecuteReader())
+                    while (r.Read())
+                    {
+                        var def = EventCatalog.Find(r.GetString(2));
+                        string who = string.Join(" ", new[] { r.IsDBNull(3) ? null : r.GetString(3), r.IsDBNull(4) ? null : r.GetString(4) }.Where(x => !string.IsNullOrEmpty(x)));
+                        s.Rows.Add(new List<string> { Local(r.GetString(0)), Sev(r.GetInt64(1)), def == null ? r.GetString(2) : def.Name, who, r.IsDBNull(5) ? "" : r.GetString(5) });
+                    }
+                return 0;
+            });
+            return s;
+        }
+
+        private ReportSection RdpSection()
+        {
+            var res = _g.RdpSessions.List(new RdpSessionQuery { IncludeConsole = true });
+            var s = new ReportSection { Key = "rdp", Title = "RDP / konsol oturumları", Note = res.WorkHours, Columns = { "Başlangıç", "Kullanıcı", "IP", "Ülke", "Durum", "Süre", "Mesai dışı" } };
+            foreach (var x in res.Rows.Take(50))
+                s.Rows.Add(new List<string> { Local(x.StartUtc), x.User, x.ClientIp, x.Country, x.State, Dur(x.DurationSeconds), x.OffHours ? "evet" : "" });
+            return s;
+        }
+
+        private ReportSection BackupSection()
+        {
+            var st = _g.Backup.GetState();
+            var s = new ReportSection { Key = "backup", Title = "SQL yedekleme geçmişi", Note = st.Config != null && st.Config.Enabled ? "açık" : "kapalı", Columns = { "Başlangıç", "Instance", "Durum", "Tetikleyen", "Özet" } };
+            foreach (var x in (st.Runs ?? new List<BackupRunDto>()).Take(20))
+                s.Rows.Add(new List<string> { Local(x.StartedUtc), x.Instance, x.Status, x.Trigger, x.Summary });
+            return s;
+        }
+
+        private ReportSection PortsSection()
+        {
+            var st = OpenPorts.Build(_g);
+            var s = new ReportSection { Key = "ports", Title = "Açık portlar", Note = st.FirewallWarning, Columns = { "Proto", "Port", "Hizmet", "Açıklık", "Risk", "24s hatalı giriş", "Süreç" } };
+            foreach (var p in st.Ports ?? new List<OpenPortDto>())
+                s.Rows.Add(new List<string> { p.Protocol, p.Port.ToString(), p.Label, p.Exposure, p.Risk, p.Failures24h >= 0 ? p.Failures24h.ToString() : "", p.Process });
+            return s;
+        }
+
+        private ReportSection ChecksSection(string scope, string title, string key)
+        {
+            var run = _g.Checks.Latest(scope);
+            var s = new ReportSection { Key = key, Title = title, Note = run.RunId == null ? "henüz tarama yok" : "son tarama " + Local(run.StartedUtc), Columns = { "Durum", "Nerede", "Konu", "Sonuç" } };
+            foreach (var x in (run.Items ?? new List<CheckItemDto>()).Where(i => !i.IsIgnored).OrderByDescending(i => (int)i.Status))
+                s.Rows.Add(new List<string> { SevC(x.Status), x.Area, x.Title, x.Summary });
+            return s;
+        }
+
+        private ReportSection SqlSection()
+        {
+            var s = new ReportSection { Key = "sql", Title = "SQL Server izleme", Columns = { "Instance", "Servis", "Sürüm / sürüm", "İzleme", "Audit" } };
+            foreach (var i in _g.Sql.List())
+            {
+                bool running = false;
+                try { running = i.IsConfigured && i.IsEnabled && _g.SqlAudit.GetState(i.InstanceName).Running; } catch { }
+                s.Rows.Add(new List<string> { i.InstanceName, i.ServiceState, (i.ProductVersion + " " + i.Edition).Trim(), i.IsConfigured && i.IsEnabled ? "açık" : "kapalı", running ? "çalışıyor" : (i.IsConfigured ? "durmuş" : "-") });
+            }
+            return s;
+        }
+
+        private ReportSection ServicesSection()
+        {
+            var st = _g.Services.GetState();
+            var s = new ReportSection { Key = "services", Title = "Servis takibi", Columns = { "Servis", "Durum", "Başlangıç", "İzleniyor", "Oto-başlat" } };
+            foreach (var x in (st.Services ?? new List<WatchedServiceDto>()).Where(w => w.Watched || w.Recommended))
+                s.Rows.Add(new List<string> { x.DisplayName + " (" + x.Name + ")", x.Status, x.StartType, x.Watched ? "evet" : "", x.AutoRestart ? "evet" : "" });
+            return s;
+        }
+
+        private static string Sev(long s) { return s >= 2 ? "Kritik" : s == 1 ? "Uyarı" : "Bilgi"; }
+        private static string SevC(CheckStatus s) { return s == CheckStatus.Kritik ? "Kritik" : s == CheckStatus.Uyari ? "Uyarı" : s == CheckStatus.Bilgi ? "Bilgi" : "Geçti"; }
+
+        private static string Local(string utc)
+        {
+            try { return DbTime.FromDb(utc).ToLocalTime().ToString("dd.MM.yyyy HH:mm", CultureInfo.InvariantCulture); }
+            catch { return utc ?? ""; }
+        }
+
+        private static string Dur(long seconds)
+        {
+            if (seconds <= 0) return "";
+            if (seconds < 3600) return (seconds / 60) + " dk";
+            return (seconds / 3600) + " sa " + (seconds % 3600 / 60) + " dk";
         }
 
         /// <summary>Hub'a POST. 403 = makinenin aktif lisansı yok (panelde görünmez); ulaşılamazsa sessizce atlanır.</summary>
@@ -197,5 +320,22 @@ namespace SecurityGuardService.Engine.Reports
         public int MemoryMb { get; set; }
         public int PendingMail { get; set; }
         public string Payload { get; set; }
+    }
+
+    /// <summary>Panel detay sekmeleri için zengin anlık görüntü (Payload = bunun JSON'u). public: PipeProtocol serialize eder.</summary>
+    public sealed class AgentReportDto
+    {
+        public DashboardDto Dashboard { get; set; }
+        public List<ReportSection> Sections { get; set; } = new List<ReportSection>();
+    }
+
+    /// <summary>UI'daki bir sayfanın tablo hali: başlık + sütunlar + satırlar (her satır sütun sayısı kadar hücre).</summary>
+    public sealed class ReportSection
+    {
+        public string Key { get; set; }
+        public string Title { get; set; }
+        public string Note { get; set; }
+        public List<string> Columns { get; set; } = new List<string>();
+        public List<List<string>> Rows { get; set; } = new List<List<string>>();
     }
 }

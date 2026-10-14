@@ -152,7 +152,7 @@ app.MapPost("/" + LicenseProtocol.ValidatePath, async (LicenseValidateRequest? r
 app.MapPost("/api/v1/agent/heartbeat", async (HeartbeatRequest? req, LicenseRepository repo) =>
 {
     if (req == null || !LicenseProtocol.IsValidHwId(req.HwId)) return Results.BadRequest(new { Error = "Geçersiz istek." });
-    if (req.Payload is { Length: > 65536 }) return Results.BadRequest(new { Error = "Payload çok büyük." });
+    if (req.Payload is { Length: > 524288 }) return Results.BadRequest(new { Error = "Payload çok büyük." });
     int licenseId = await repo.HeartbeatAsync(req);
     if (licenseId == 0) return Results.StatusCode(StatusCodes.Status403Forbidden); // makinenin aktif lisansı yok
     return Results.Ok(new { LicenseId = licenseId });
