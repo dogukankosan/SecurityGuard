@@ -154,7 +154,8 @@ partial class SgAutoTest
                 // 4) Doğru şifreyle aç (SQL Server'ın okuyabildiği yedek klasörüne) ve FARKLI ADLA geri yükle
                 string pw = Send<string>(Commands.BackupGetPassword, new PasswordConfirmRequest { Password = loginPassword });
                 Check(!string.IsNullOrEmpty(pw), "Arşiv şifresi yönetici şifresiyle alınabildi");
-                var ex = RunOut(rarExe, "x \"-p" + pw + "\" -o+ -y \"" + rar + "\" \"" + bakDir + "\\\\\"");
+                // Şifre STDIN'den (ürünün RunRar'ıyla aynı): komut satırı '-p' özel karakterli şifrede kod 11 verebilir.
+                var ex = RunOutStdin(rarExe, "x -o+ -y -idq -hp \"" + rar + "\" \"" + bakDir + "\\\\\"", pw);
                 extracted = Path.Combine(bakDir, Path.GetFileName(bakStep.ArchivePath));
                 Check(ex.Item1 == 0 && File.Exists(extracted), "Arşiv doğru şifreyle açıldı (" + (File.Exists(extracted) ? new FileInfo(extracted).Length / 1024 + " KB .bak" : "çıkış kodu " + ex.Item1 + ": " + Short(ex.Item2.Trim())) + ")");
                 if (File.Exists(extracted))

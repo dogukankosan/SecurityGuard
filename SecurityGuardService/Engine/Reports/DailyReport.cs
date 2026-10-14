@@ -561,15 +561,15 @@ namespace SecurityGuardService.Engine.Reports
                 var ports = _g.PortRestrictions.GetState();
                 var portOn = ports.Items.Where(i => i.Enabled).ToList();
                 if (portOn.Count > 0)
-                    table.Add("Port kısıtları", (ports.FirewallOk ? Bold(portOn.Count + " kısıt uygulanıyor", Green) : Bold(H(ports.FirewallMessage), Orange))
-                        + (portOn.Any(i => !string.IsNullOrEmpty(i.Countries)) ? "; " + (ports.GeoWarning != null ? Bold(H(ports.GeoWarning), Orange) : H(ports.GeoInfo)) : ""));
+                    table.Add("Port kısıtları", (ports.FirewallOk ? Bold(portOn.Count + " kısıt uygulanıyor", Green) : Bold(ports.FirewallMessage, Orange))
+                        + (portOn.Any(i => !string.IsNullOrEmpty(i.Countries)) ? "; " + (ports.GeoWarning != null ? Bold(ports.GeoWarning, Orange) : H(ports.GeoInfo)) : ""));
 
                 // Tuzak dosyalar
                 var canary = _g.Canary.GetState();
                 var canaryOn = canary.Folders.Where(f => f.Enabled).ToList();
                 var canaryBad = canaryOn.Where(f => !f.State.StartsWith("İzleniyor", StringComparison.Ordinal)).ToList();
                 table.Add("Tuzak dosyalar", canaryOn.Count == 0 ? Bold("İzlenen klasör yok (paylaşım / yedek klasörü bulunamadı)", Orange)
-                    : (canaryBad.Count == 0 ? Bold("İzleniyor", Green) : Bold(canaryBad.Count + " klasörde sorun: " + H(string.Join("; ", canaryBad.Select(f => f.Path + " - " + f.State))), Orange))
+                    : (canaryBad.Count == 0 ? Bold("İzleniyor", Green) : Bold(canaryBad.Count + " klasörde sorun: " + string.Join("; ", canaryBad.Select(f => f.Path + " - " + f.State)), Orange))
                       + " (" + canaryOn.Count + " klasör" + (canary.FileAuditEnabled ? "" : "; dosya sistemi denetimi kapalı, mailde kullanıcı / program yazmaz") + ")");
 
                 // SQL izleme

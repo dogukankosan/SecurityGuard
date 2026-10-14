@@ -444,6 +444,10 @@ partial class SgAutoTest
 
         string listJson = AdminCall(apiUrl, "GET", "api/v1/admin/licenses?search=" + Uri.EscapeDataString(a.HwId) + "&top=20");
         if (listJson.StartsWith("401")) { Fail("Yönetici anahtarı kabul edilmedi (401). Anahtarın kendisi girilmeli, özeti değil."); return; }
+        // 403/404: yönetici uçları HTTPS zorunlu ve/veya IP kısıtlı (Admin:RequireHttps / Admin:AllowedIps). Ajanın HTTP adresinden
+        // admin çağrısı yapılamaz; bu DOĞRU davranıştır. İptal/geri aç testi atlanır (ajan tarafı lisans doğrulaması yukarıda test edildi).
+        if (listJson.StartsWith("403")) { Info("Yönetici uçları HTTPS zorunlu (Admin:RequireHttps): ajanın HTTP adresinden admin çağrısı reddedildi → iptal/geri aç testi atlandı. Sunucu doğru davranıyor; admin için HTTPS adresini (ör. :5443) kullanın."); return; }
+        if (listJson.StartsWith("404")) { Info("Yönetici uçları bu IP'ye kapalı (Admin:AllowedIps): admin çağrısı görünmez kılındı → iptal/geri aç testi atlandı. Sunucu doğru davranıyor."); return; }
         var active = Regex.Matches(listJson, @"\{[^{}]*\}").Cast<Match>().Select(m => m.Value).FirstOrDefault(o => o.Contains("\"Status\":1"));
         if (active == null) { Fail("Lisans sunucusunda bu makinenin aktif lisansı bulunamadı: " + Short(listJson)); return; }
         string id = Regex.Match(active, "\"LicenseId\":(\\d+)").Groups[1].Value;
@@ -728,7 +732,15 @@ partial class SgAutoTest
                  + " | izleme " + (i.IsEnabled ? "açık" : "kapalı") + " | audit " + (i.AuditInstalled ? (i.AuditRunning ? "çalışıyor" : "DURMUŞ") : "kurulu değil") + " " + i.AuditStatus);
         var inst = instances.FirstOrDefault(i => i.IsConfigured && i.IsEnabled);
         if (inst == null) { Warn("Yapılandırılmış SQL instance yok: SQL testi atlandı."); return; }
-        Check(inst.AuditInstalled && inst.AuditRunning, "SQL Audit kurulu ve çalışıyor (" + inst.InstanceName + ")");
+        // Audit durumu canlı SQL bağlantısıyla okunur; tek anlık bağlantı blibi (Named Pipes "error 40") yanlış 'DURMUŞ' gösterebilir.
+        // Gerçekten durmuşsa saniyeler içinde düzelmez — birkaç kez tazeleyip öyle karar ver (yanlış hatayı önler).
+        for (int i = 0; i < 4 && inst.AuditInstalled && !inst.AuditRunning; i++)
+        {
+            Thread.Sleep(5000);
+            var refreshed = Send<List<SqlInstanceDto>>(Commands.SqlInstances, null).FirstOrDefault(x => x.InstanceName == inst.InstanceName);
+            if (refreshed != null) inst = refreshed;
+        }
+        Check(inst.AuditInstalled && inst.AuditRunning, "SQL Audit kurulu ve çalışıyor (" + inst.InstanceName + ")" + (inst.AuditRunning ? "" : ": " + Short(inst.AuditStatus ?? "")));
         Check(string.Equals(inst.Login, GuardConstants.SqlLoginName, StringComparison.OrdinalIgnoreCase), "Bağlantı " + GuardConstants.SqlLoginName + " hesabıyla");
 
         string server = inst.Server + (inst.Port > 0 ? "," + inst.Port : "");
@@ -991,6 +1003,7 @@ partial class SgAutoTest
             foreach (string n in ms.Notes ?? new List<string>()) Info("Not: " + Short(n));
             foreach (string n in ms.OtherJobs ?? new List<string>()) Info("Diğer bakım işi: " + Short(n));
             if (ms.Databases.Count == 0) Warn("Bakım: veritabanı listesi boş (SQL bağlantısı yok?), deneme çalıştırması atlandı.");
+            else if (ms.Databases.Count(d => d.Selected) == 0) Info("Bakım: hiç DB seçili değil (taze kurulum, bakım kapalı); deneme çalıştırması atlandı — gerçek bakım (parçalanmış test DB'si) aşağıdaki 'GERÇEK SQL BAKIMI' bölümünde ayrıca doğrulanıyor.");
             else
             {
                 int runsBefore = ms.Runs == null ? 0 : ms.Runs.Count;

@@ -363,6 +363,32 @@ partial class SgAutoTest
         }
     }
 
+    /// <summary>
+    /// RunOut gibi ama şifreyi komut satırı yerine STDIN'den verir — ürünün RunRar'ıyla (SqlBackup) birebir aynı yöntem.
+    /// Arşiv stdin şifresiyle oluşturulduğundan, açarken de stdin kullanmak gerekir: komut satırı '-p' özel karakterli /
+    /// ASCII-dışı şifrelerde (ve stdin ile komut satırı kod sayfası farkında) bozulup "yanlış şifre" (kod 11) verir.
+    /// Rar bazı sürümlerde onay için şifreyi iki kez isteyebildiğinden iki kez yazılır; fazlası okunmazsa zararsız.
+    /// </summary>
+    static Tuple<int, string> RunOutStdin(string exe, string args, string stdinLine)
+    {
+        using (var p = Process.Start(new ProcessStartInfo(exe, args) { UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true, RedirectStandardInput = true }))
+        {
+            try { p.StandardInput.WriteLine(stdinLine); p.StandardInput.WriteLine(stdinLine); p.StandardInput.Flush(); }
+            catch (IOException) { }
+            finally { try { p.StandardInput.Close(); } catch { } }
+            var so = p.StandardOutput.ReadToEndAsync();
+            var se = p.StandardError.ReadToEndAsync();
+            if (!p.WaitForExit(120000))
+            {
+                try { p.Kill(); } catch { }
+                Line("  (zaman aşımı, komut sonlandırıldı: " + exe + " " + Short(args) + ")", ConsoleColor.Yellow);
+                return Tuple.Create(-999, "zaman aşımı");
+            }
+            p.WaitForExit();
+            return Tuple.Create(p.ExitCode, so.Result + se.Result);
+        }
+    }
+
     // ================================================================ Servis takibi (W32Time ile: zararsız, kısa süre durdurulur)
 
     const string TestSvc = "W32Time";
@@ -621,7 +647,11 @@ partial class SgAutoTest
 
         // Fidye gibi ad değiştir (sonraki bildirim en erken 60 sn sonra gider)
         var t2 = LastId();
-        File.Move(first, first + ".locked");
+        // Önceki koşudan kalan .locked olabilir (temizlik servis/AV dosyayı tutarken yarım kalmışsa):
+        // üstüne taşıma "zaten var" (IOException) vermesin diye önce temizle — test idempotent olsun.
+        string locked = first + ".locked";
+        if (File.Exists(locked)) { try { File.SetAttributes(locked, FileAttributes.Normal); File.Delete(locked); } catch { } }
+        File.Move(first, locked);
         Line("  Dosya adı .locked yapıldı; bildirim bekleniyor (iki bildirim arası en az 60 sn)...", ConsoleColor.Gray);
         ev = WaitEvent("Win.CanaryTouched", t2, 90);
         Check(ev != null && ev.Detail != null && ev.Detail.Contains(".locked"), "Ad değiştirme → kritik olay, yeni ad yazıyor" + MailText(ev));
