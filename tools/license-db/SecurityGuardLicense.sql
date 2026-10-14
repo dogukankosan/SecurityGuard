@@ -316,4 +316,118 @@ BEGIN
 END
 GO
 
+-- ============================================================ Merkezi panel (ajan durum anlık görüntüsü)
+-- Her aktif lisansın GÜNCEL durumu (tek satır / lisans). Ajan outbound heartbeat ile (1-5 dk) günceller.
+-- Geçmiş tutulmaz (panel salt-okunur özet); gerekirse ileride AgentStatusHistory eklenir.
+
+IF OBJECT_ID(N'dbo.AgentStatus', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.AgentStatus
+    (
+        LicenseId         int           NOT NULL,
+        HwId              char(39)      NOT NULL,
+        LastHeartbeatUtc  datetime2(0)  NOT NULL,
+        AgentVersion      varchar(32)   NULL,
+        MachineName       nvarchar(64)  NULL,
+        ServiceReady      bit           NOT NULL CONSTRAINT DF_AgentStatus_Ready  DEFAULT (0),
+        LicenseValid      bit           NOT NULL CONSTRAINT DF_AgentStatus_Lic    DEFAULT (0),
+        ProtectionOk      bit           NOT NULL CONSTRAINT DF_AgentStatus_Prot   DEFAULT (0),
+        SqlMonitoring     bit           NOT NULL CONSTRAINT DF_AgentStatus_Sql    DEFAULT (0),
+        BannedIps         int           NOT NULL CONSTRAINT DF_AgentStatus_Bans   DEFAULT (0),
+        NewBans24h        int           NOT NULL CONSTRAINT DF_AgentStatus_NewB   DEFAULT (0),
+        FailedLogins24h   int           NOT NULL CONSTRAINT DF_AgentStatus_Fails  DEFAULT (0),
+        CriticalEvents24h int           NOT NULL CONSTRAINT DF_AgentStatus_Crit   DEFAULT (0),
+        MemoryMb          int           NOT NULL CONSTRAINT DF_AgentStatus_Mem    DEFAULT (0),
+        PendingMail       int           NOT NULL CONSTRAINT DF_AgentStatus_Mail   DEFAULT (0),
+        Payload           nvarchar(max) NULL,     -- detay sayfası için tam JSON anlık görüntü
+        UpdatedUtc        datetime2(0)  NOT NULL CONSTRAINT DF_AgentStatus_Upd    DEFAULT (SYSUTCDATETIME()),
+        CONSTRAINT PK_AgentStatus PRIMARY KEY CLUSTERED (LicenseId),
+        CONSTRAINT FK_AgentStatus_License FOREIGN KEY (LicenseId) REFERENCES dbo.Licenses (LicenseId)
+    );
+END
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_AgentStatus_Heartbeat' AND object_id = OBJECT_ID(N'dbo.AgentStatus'))
+    CREATE NONCLUSTERED INDEX IX_AgentStatus_Heartbeat ON dbo.AgentStatus (LastHeartbeatUtc DESC);
+GO
+
+-- Ajan heartbeat: SADECE aktif lisansı olan makine kabul edilir (lisanssız/iptal ajan panele düşmez).
+-- Müşteri adı ayrıca gelmez; lisanstan okunur (tek doğruluk kaynağı). LicenseId=0 => reddedildi.
+CREATE OR ALTER PROCEDURE dbo.usp_Agent_Heartbeat
+    @HwId              char(39),
+    @AgentVersion      varchar(32)   = NULL,
+    @MachineName       nvarchar(64)  = NULL,
+    @ServiceReady      bit           = 0,
+    @LicenseValid      bit           = 0,
+    @ProtectionOk      bit           = 0,
+    @SqlMonitoring     bit           = 0,
+    @BannedIps         int           = 0,
+    @NewBans24h        int           = 0,
+    @FailedLogins24h   int           = 0,
+    @CriticalEvents24h int           = 0,
+    @MemoryMb          int           = 0,
+    @PendingMail       int           = 0,
+    @Payload           nvarchar(max) = NULL
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SET XACT_ABORT ON;
+    DECLARE @now datetime2(0) = SYSUTCDATETIME(), @id int;
+
+    SELECT TOP (1) @id = LicenseId FROM dbo.Licenses WHERE HwId = @HwId AND Status = 1 ORDER BY ExpiresUtc DESC;
+    IF @id IS NULL BEGIN SELECT CAST(0 AS int) AS LicenseId; RETURN; END
+
+    UPDATE dbo.AgentStatus
+    SET HwId = @HwId, LastHeartbeatUtc = @now, AgentVersion = @AgentVersion, MachineName = @MachineName,
+        ServiceReady = @ServiceReady, LicenseValid = @LicenseValid, ProtectionOk = @ProtectionOk, SqlMonitoring = @SqlMonitoring,
+        BannedIps = @BannedIps, NewBans24h = @NewBans24h, FailedLogins24h = @FailedLogins24h, CriticalEvents24h = @CriticalEvents24h,
+        MemoryMb = @MemoryMb, PendingMail = @PendingMail, Payload = @Payload, UpdatedUtc = @now
+    WHERE LicenseId = @id;
+
+    IF @@ROWCOUNT = 0
+        INSERT dbo.AgentStatus (LicenseId, HwId, LastHeartbeatUtc, AgentVersion, MachineName, ServiceReady, LicenseValid, ProtectionOk, SqlMonitoring,
+                                BannedIps, NewBans24h, FailedLogins24h, CriticalEvents24h, MemoryMb, PendingMail, Payload, UpdatedUtc)
+        VALUES (@id, @HwId, @now, @AgentVersion, @MachineName, @ServiceReady, @LicenseValid, @ProtectionOk, @SqlMonitoring,
+                @BannedIps, @NewBans24h, @FailedLogins24h, @CriticalEvents24h, @MemoryMb, @PendingMail, @Payload, @now);
+
+    SELECT @id AS LicenseId;
+END
+GO
+
+-- Panel: tüm aktif lisanslar + (varsa) güncel ajan durumu. Online/offline hesabı app'te (LastHeartbeatUtc eşiğiyle).
+CREATE OR ALTER PROCEDURE dbo.usp_Panel_Agents
+    @Search nvarchar(200) = NULL, @Top int = 1000
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SELECT TOP (@Top)
+        l.LicenseId, l.HwId, l.CustomerName, l.ExpiresUtc, l.Status AS LicenseStatus,
+        COALESCE(a.MachineName, l.LastMachine)   AS MachineName,
+        COALESCE(a.AgentVersion, l.LastVersion)  AS AgentVersion,
+        a.LastHeartbeatUtc, a.ServiceReady, a.LicenseValid, a.ProtectionOk, a.SqlMonitoring,
+        a.BannedIps, a.NewBans24h, a.FailedLogins24h, a.CriticalEvents24h, a.MemoryMb, a.PendingMail
+    FROM dbo.Licenses l
+    LEFT JOIN dbo.AgentStatus a ON a.LicenseId = l.LicenseId
+    WHERE l.Status = 1
+      AND (@Search IS NULL OR l.CustomerName LIKE N'%' + @Search + N'%' OR l.HwId LIKE '%' + @Search + '%' OR l.LastMachine LIKE N'%' + @Search + N'%')
+    ORDER BY l.CustomerName, a.LastHeartbeatUtc DESC
+    OPTION (RECOMPILE);
+END
+GO
+
+-- Panel: tek müşteri/makine detayı (tam JSON anlık görüntü dahil).
+CREATE OR ALTER PROCEDURE dbo.usp_Panel_AgentDetail
+    @LicenseId int
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SELECT l.LicenseId, l.HwId, l.CustomerName, l.ExpiresUtc, l.Status AS LicenseStatus, l.Note,
+           l.CreatedUtc, l.LastSeenUtc, l.LastIp,
+           a.LastHeartbeatUtc, a.AgentVersion, a.MachineName, a.ServiceReady, a.LicenseValid, a.ProtectionOk, a.SqlMonitoring,
+           a.BannedIps, a.NewBans24h, a.FailedLogins24h, a.CriticalEvents24h, a.MemoryMb, a.PendingMail, a.Payload
+    FROM dbo.Licenses l
+    LEFT JOIN dbo.AgentStatus a ON a.LicenseId = l.LicenseId
+    WHERE l.LicenseId = @LicenseId;
+END
+GO
+
 PRINT N'SecurityGuardLicense hazır.';

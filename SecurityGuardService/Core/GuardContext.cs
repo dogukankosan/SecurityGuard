@@ -79,7 +79,11 @@ namespace SecurityGuardService.Core
             Reports = new DailyReport(this);
             MonthlyReports = new MonthlyReport(this);
             Watch = new SystemWatch(database, settings, Events);
+            Central = new CentralReporter(this);
         }
+
+        /// <summary>Merkezi panele durum bildirimi (heartbeat, outbound; varsayılan açık).</summary>
+        public CentralReporter Central { get; private set; }
 
         /// <summary>Lisans doğrulama; geçerli değilse izleme / koruma durur (LicenseGate).</summary>
         public LicenseManager License { get; private set; }
@@ -203,6 +207,7 @@ namespace SecurityGuardService.Core
                 context.Reports.Start();
                 context.MonthlyReports.Start();
                 context.Watch.Start();
+                context.Central.Start();
                 return context;
             }
             catch
@@ -307,6 +312,14 @@ namespace SecurityGuardService.Core
             catch (Exception ex)
             {
                 AppLog.Error(Module, "Port kısıtı nöbeti durdurulamadı.", ex);
+            }
+            try
+            {
+                if (Central != null) Central.Dispose();
+            }
+            catch (Exception ex)
+            {
+                AppLog.Error(Module, "Merkezi panel bildirimi durdurulamadı.", ex);
             }
             try
             {

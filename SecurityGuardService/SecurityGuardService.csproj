@@ -81,6 +81,7 @@
     <Compile Include="Engine\Reports\DailyReport.cs" />
     <Compile Include="Engine\Reports\MonthlyReport.cs" />
     <Compile Include="Engine\Reports\Dashboard.cs" />
+    <Compile Include="Engine\Reports\CentralReporter.cs" />
     <Compile Include="Engine\Health\SystemWatch.cs" />
     <Compile Include="Engine\Health\SoftwareWatch.cs" />
     <Compile Include="Engine\Health\TaskWatch.cs" />

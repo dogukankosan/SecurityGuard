@@ -12,6 +12,9 @@
         /// <summary>Lisans sunucusu adresi (boş = GuardConstants.LicenseDefaultApiUrl).</summary>
         public const string LicenseApiUrl = "license.apiUrl";
 
+        /// <summary>Merkezi panele durum bildirimi (heartbeat) açık mı (varsayılan açık). Hub = lisans sunucusu.</summary>
+        public const string CentralReportEnabled = "central.reportEnabled";
+
         /// <summary>EventLog HMAC zinciri anahtarı (şifreli, base64).</summary>
         public const string HmacKey = "security.hmacKey";
 

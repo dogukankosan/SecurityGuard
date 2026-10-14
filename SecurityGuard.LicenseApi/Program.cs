@@ -144,6 +144,21 @@ app.MapPost("/" + LicenseProtocol.ValidatePath, async (LicenseValidateRequest? r
 .WithTags("İstemci")
 .WithSummary("SecurityGuard servisinin çağırdığı doğrulama (imzalı cevap).");
 
+// ---- İstemci: merkezi panel heartbeat (ajan outbound, 1-5 dk) ----
+// Kimlik = HwId + aktif lisans (ayrı sır yok; validate ile aynı güven modeli). Müşteri adı lisanstan okunur.
+// Faz 1 salt-okunur: HwId'yi bilen biri sahte durum gönderebilir (düşük risk). Faz 2'de payload RSA imzalanacak.
+app.MapPost("/api/v1/agent/heartbeat", async (HeartbeatRequest? req, LicenseRepository repo) =>
+{
+    if (req == null || !LicenseProtocol.IsValidHwId(req.HwId)) return Results.BadRequest(new { Error = "Geçersiz istek." });
+    if (req.Payload is { Length: > 65536 }) return Results.BadRequest(new { Error = "Payload çok büyük." });
+    int licenseId = await repo.HeartbeatAsync(req);
+    if (licenseId == 0) return Results.StatusCode(StatusCodes.Status403Forbidden); // makinenin aktif lisansı yok
+    return Results.Ok(new { LicenseId = licenseId });
+})
+.RequireRateLimiting("validate")
+.WithTags("İstemci")
+.WithSummary("Ajanın periyodik durum bildirimi (merkezi panel).");
+
 // ---- Yönetici ----
 var admin = app.MapGroup("/api/v1/admin").AddEndpointFilter<AdminKeyFilter>().RequireRateLimiting("admin").WithTags("Yönetici");
 
@@ -193,6 +208,15 @@ admin.MapGet("/unknown-machines", async (int? days, LicenseRepository repo) =>
 admin.MapPost("/purge", async (int? keepDays, LicenseRepository repo) =>
     Results.Ok(new { Deleted = await repo.PurgeAsync(Math.Clamp(keepDays ?? 180, 7, 3650)) }))
     .WithSummary("Eski doğrulama kayıtlarını sil.");
+
+// ---- Yönetici: merkezi panel (tüm müşterilerin durumu) ----
+admin.MapGet("/panel/agents", async (string? search, int? top, LicenseRepository repo) =>
+    Results.Ok(await repo.PanelAgentsAsync(search, Math.Clamp(top ?? 1000, 1, 5000))))
+    .WithSummary("Tüm aktif müşteriler + ajan durumları (merkezi panel ızgarası).");
+
+admin.MapGet("/panel/agents/{id:int}", async (int id, LicenseRepository repo) =>
+    await repo.PanelAgentDetailAsync(id) is { } row ? Results.Ok(row) : Results.NotFound(new { Error = "Bulunamadı." }))
+    .WithSummary("Tek müşteri / makine detayı (merkezi panel).");
 
 app.Run();
 

@@ -69,6 +69,35 @@ public sealed class LicenseRepository(IConfiguration config)
         return await c.ExecuteScalarAsync<long>("dbo.usp_Checks_Purge", new { KeepDays = keepDays }, commandType: CommandType.StoredProcedure, commandTimeout: 600);
     }
 
+    // ---- Merkezi panel ----
+
+    /// <summary>Ajan heartbeat: durumu kaydeder. Dönen LicenseId=0 ise makinenin aktif lisansı yok (reddedildi).</summary>
+    public async Task<int> HeartbeatAsync(HeartbeatRequest r)
+    {
+        await using var c = Open();
+        return await c.ExecuteScalarAsync<int>("dbo.usp_Agent_Heartbeat", new
+        {
+            r.HwId,
+            AgentVersion = Trim(r.AgentVersion, 32),
+            MachineName = Trim(r.MachineName, 64),
+            r.ServiceReady, r.LicenseValid, r.ProtectionOk, r.SqlMonitoring,
+            r.BannedIps, r.NewBans24h, r.FailedLogins24h, r.CriticalEvents24h, r.MemoryMb, r.PendingMail,
+            r.Payload
+        }, commandType: CommandType.StoredProcedure, commandTimeout: 15);
+    }
+
+    public async Task<IEnumerable<PanelAgentRow>> PanelAgentsAsync(string? search, int top)
+    {
+        await using var c = Open();
+        return await c.QueryAsync<PanelAgentRow>("dbo.usp_Panel_Agents", new { Search = string.IsNullOrWhiteSpace(search) ? null : search.Trim(), Top = top }, commandType: CommandType.StoredProcedure);
+    }
+
+    public async Task<PanelAgentDetailRow?> PanelAgentDetailAsync(int licenseId)
+    {
+        await using var c = Open();
+        return await c.QuerySingleOrDefaultAsync<PanelAgentDetailRow>("dbo.usp_Panel_AgentDetail", new { LicenseId = licenseId }, commandType: CommandType.StoredProcedure);
+    }
+
     private static string? Trim(string? s, int max) => s == null ? null : s.Length <= max ? s : s[..max];
 }
 
@@ -140,4 +169,77 @@ public sealed class UpdateLicenseRequest
     public string? Customer { get; set; }
     public DateTime? ExpiresUtc { get; set; }
     public string? Note { get; set; }
+}
+
+// ---- Merkezi panel ----
+
+/// <summary>Ajan → hub heartbeat (müşteri adı GÖNDERİLMEZ; lisanstan okunur). HwId + aktif lisans = kimlik.</summary>
+public sealed class HeartbeatRequest
+{
+    public string HwId { get; set; } = "";
+    public string? AgentVersion { get; set; }
+    public string? MachineName { get; set; }
+    public bool ServiceReady { get; set; }
+    public bool LicenseValid { get; set; }
+    public bool ProtectionOk { get; set; }
+    public bool SqlMonitoring { get; set; }
+    public int BannedIps { get; set; }
+    public int NewBans24h { get; set; }
+    public int FailedLogins24h { get; set; }
+    public int CriticalEvents24h { get; set; }
+    public int MemoryMb { get; set; }
+    public int PendingMail { get; set; }
+    /// <summary>Detay sayfası için tam JSON anlık görüntü (opsiyonel).</summary>
+    public string? Payload { get; set; }
+}
+
+/// <summary>Panel ızgara satırı: lisans + güncel ajan durumu (LastHeartbeatUtc null = hiç bağlanmadı / eski sürüm).</summary>
+public sealed class PanelAgentRow
+{
+    public int LicenseId { get; set; }
+    public string HwId { get; set; } = "";
+    public string CustomerName { get; set; } = "";
+    public DateTime ExpiresUtc { get; set; }
+    public byte LicenseStatus { get; set; }
+    public string? MachineName { get; set; }
+    public string? AgentVersion { get; set; }
+    public DateTime? LastHeartbeatUtc { get; set; }
+    public bool? ServiceReady { get; set; }
+    public bool? LicenseValid { get; set; }
+    public bool? ProtectionOk { get; set; }
+    public bool? SqlMonitoring { get; set; }
+    public int? BannedIps { get; set; }
+    public int? NewBans24h { get; set; }
+    public int? FailedLogins24h { get; set; }
+    public int? CriticalEvents24h { get; set; }
+    public int? MemoryMb { get; set; }
+    public int? PendingMail { get; set; }
+}
+
+/// <summary>Panel detay: lisans + güncel ajan durumu + tam JSON anlık görüntü.</summary>
+public sealed class PanelAgentDetailRow
+{
+    public int LicenseId { get; set; }
+    public string HwId { get; set; } = "";
+    public string CustomerName { get; set; } = "";
+    public DateTime ExpiresUtc { get; set; }
+    public byte LicenseStatus { get; set; }
+    public string? Note { get; set; }
+    public DateTime CreatedUtc { get; set; }
+    public DateTime? LastSeenUtc { get; set; }
+    public string? LastIp { get; set; }
+    public DateTime? LastHeartbeatUtc { get; set; }
+    public string? AgentVersion { get; set; }
+    public string? MachineName { get; set; }
+    public bool? ServiceReady { get; set; }
+    public bool? LicenseValid { get; set; }
+    public bool? ProtectionOk { get; set; }
+    public bool? SqlMonitoring { get; set; }
+    public int? BannedIps { get; set; }
+    public int? NewBans24h { get; set; }
+    public int? FailedLogins24h { get; set; }
+    public int? CriticalEvents24h { get; set; }
+    public int? MemoryMb { get; set; }
+    public int? PendingMail { get; set; }
+    public string? Payload { get; set; }
 }
