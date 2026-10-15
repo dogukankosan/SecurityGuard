@@ -2,6 +2,7 @@ using System.Net;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading.RateLimiting;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Data.SqlClient;
 using Microsoft.OpenApi.Models;
@@ -53,6 +54,16 @@ builder.Services.AddSingleton(sp => new Signing(KeyFilePath(sp.GetRequiredServic
 builder.Services.AddSingleton<AdminKey>();
 builder.Services.AddSingleton<AdminAccess>();
 builder.Services.AddSingleton<UpdateCatalog>();
+
+// Barındırıcı (IIS / reverse proxy) SSL'i kendisi sonlandırırsa: orijinal şema (https) + gerçek istemci IP
+// X-Forwarded-Proto / X-Forwarded-For başlıklarından alınır. Böylece Admin:RequireHttps ve Admin:AllowedIps
+// proxy arkasında doğru çalışır. (Doğrudan çalışırken bu başlıklar olmaz, no-op.)
+builder.Services.Configure<ForwardedHeadersOptions>(o =>
+{
+    o.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    o.KnownNetworks.Clear();
+    o.KnownProxies.Clear();
+});
 builder.Services.AddHostedService<PurgeService>();
 
 int validatePerMinute = builder.Configuration.GetValue("RateLimit:ValidatePerMinute", 30);
@@ -104,8 +115,9 @@ if (adminKeys.Count > 0 && !adminAccess.Restricted)
 if (adminKeys.Count > 0 && !adminAccess.RequireHttps)
     app.Logger.LogWarning("Admin:RequireHttps kapalı: yönetici anahtarı (X-Admin-Key) HTTP ile düz metin gidebilir. HTTPS kurup Admin:RequireHttps=true yapın.");
 
+app.UseForwardedHeaders(); // barındırıcı proxy'si arkasında şema + istemci IP düzeltmesi (admin uçları için şart)
 app.UseDefaultFiles();
-app.UseStaticFiles(); // wwwroot/panel.html → merkezi web paneli (admin anahtarıyla, HTTPS 5443 üzerinden)
+app.UseStaticFiles(); // wwwroot/panel.html → merkezi web paneli (admin anahtarıyla)
 app.UseRateLimiter();
 if (swagger)
 {
@@ -407,7 +419,18 @@ public sealed class UpdateCatalog(IConfiguration config)
     private string _path = ""; private DateTime _write; private long _size; private string _sha = "";
 
     public string Version => (config["Update:Version"] ?? "").Trim();
-    public string PackagePath => (config["Update:PackagePath"] ?? "").Trim();
+
+    /// <summary>Paket yolu: mutlak ya da uygulama klasörüne göre (ör. "updates\\SecurityGuard-1.1.0.0.zip").</summary>
+    public string PackagePath
+    {
+        get
+        {
+            var p = (config["Update:PackagePath"] ?? "").Trim();
+            if (p.Length == 0) return "";
+            return Path.IsPathRooted(p) ? p : Path.Combine(AppContext.BaseDirectory, p);
+        }
+    }
+
     public bool Configured => Version.Length > 0 && PackagePath.Length > 0 && File.Exists(PackagePath);
     public FileInfo PackageFile => Configured ? new FileInfo(PackagePath) : null;
 
