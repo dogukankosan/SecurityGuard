@@ -125,7 +125,8 @@ namespace SecurityGuardUpdater
             catch (Exception ex)
             {
                 Log("Kopyalama başarısız (" + ex.Message + "), eski sürüm geri yükleniyor...");
-                Rollback(backup);
+                try { KillUi(UiDir); Rollback(backup); }
+                catch (Exception rex) { Log("Geri yükleme kısmen başarısız: " + rex.Message); }
                 TryStart();
                 throw new UpdateException("Güncelleme uygulanamadı, eski sürüm geri yüklendi.");
             }
@@ -280,15 +281,21 @@ namespace SecurityGuardUpdater
 
         private static void KillUi(string uiDir)
         {
+            bool killed = false;
             foreach (var p in SafeProcesses("SecurityGuardUI"))
             {
                 try
                 {
-                    if (p.MainModule != null && p.MainModule.FileName.StartsWith(uiDir, StringComparison.OrdinalIgnoreCase))
-                    { p.Kill(); p.WaitForExit(5000); }
+                    // Yol eşleşmesini DENE ama erişilemezse (farklı bitness / izin) ismiyle zaten bizim ürünümüz → yine de kapat.
+                    bool match = true;
+                    try { if (p.MainModule != null) match = p.MainModule.FileName.StartsWith(uiDir, StringComparison.OrdinalIgnoreCase); }
+                    catch { match = true; }
+                    if (match) { p.Kill(); p.WaitForExit(5000); killed = true; }
                 }
                 catch { }
             }
+            // Dosya tutamaçları bırakılsın (kill'den hemen sonra kilit birkaç yüz ms sürebilir)
+            if (killed) Thread.Sleep(1500);
         }
 
         private static Process[] SafeProcesses(string name)
