@@ -51,6 +51,17 @@ namespace SecurityGuardUpdater
 
         public PipeResponse Send(string command, object payload = null, int timeoutSec = 60)
         {
+            // Servis güncelleme sırasında yeniden başladıysa mevcut bağlantı bayat olabilir ("Pipe is broken").
+            // Böyle bir durumda bağlantı sıfırlanır; bir kez sessizce yeniden bağlanıp tekrar deneriz.
+            try { return SendOnce(command, payload, timeoutSec); }
+            catch (UpdateException) when (_pipe == null)
+            {
+                return SendOnce(command, payload, timeoutSec);
+            }
+        }
+
+        private PipeResponse SendOnce(string command, object payload, int timeoutSec)
+        {
             Connect();
             var req = new PipeRequest { Command = command, Token = Token, Payload = payload == null ? null : PipeProtocol.ToJson(payload) };
             using (var cts = new CancellationTokenSource(TimeSpan.FromSeconds(timeoutSec)))
