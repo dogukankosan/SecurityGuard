@@ -195,12 +195,16 @@ function sev(r){ return issues(r).reduce((m,i)=>Math.max(m,i.lvl),0); }
 function hcolor(s){ return s>=3?'var(--red)':s>=2?'var(--orange)':'var(--green)'; }
 
 async function api(path){
-  const r=await fetch(path,{headers:{'X-Admin-Key':$('#key').value.trim()},cache:'no-store'});
+  let r;
+  try{ r=await fetch(path,{headers:{'X-Admin-Key':$('#key').value.trim()},cache:'no-store'}); }
+  catch{ throw 'Sunucuya ulaşılamadı. İnternet bağlantınızı ve adresi kontrol edin.'; }
   if(r.status===401)throw'Yönetici anahtarı kabul edilmedi (401).';
   if(r.status===403)throw'HTTPS zorunlu ya da IP izinli değil (403).';
-  if(r.status===404)throw'Erişim yok (404): IP izin listesinde değilsiniz.';
+  if(r.status===404)throw'Erişim yok (404): adres yanlış ya da IP izin listesinde değilsiniz.';
+  if(r.status===429)throw'Çok fazla istek (429): biraz bekleyip tekrar deneyin.';
   if(!r.ok)throw'Sunucu hatası: '+r.status;
-  return r.json();
+  try{ return await r.json(); }
+  catch{ throw 'Sunucudan beklenmeyen cevap (JSON okunamadı).'; }
 }
 
 async function load(){
