@@ -9,6 +9,8 @@
     <InvariantGlobalization>false</InvariantGlobalization>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <NoWarn>$(NoWarn);CS1591</NoWarn>
+    <!-- Sadece Türkçe dil kaynakları tutulur; diğer diller (cs, de, es, fr, ja, ...) yayına kopyalanmaz -->
+    <SatelliteResourceLanguages>tr</SatelliteResourceLanguages>
   </PropertyGroup>
 
   <ItemGroup>
