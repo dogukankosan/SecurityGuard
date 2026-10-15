@@ -97,8 +97,13 @@ namespace SecurityGuardUpdater
             ZipFile.ExtractToDirectory(zip, staged);
             string stagedService = Path.Combine(staged, "Service");
             string stagedUi = Path.Combine(staged, "UI");
-            if (!File.Exists(Path.Combine(stagedService, "SecurityGuardService.exe")))
-                throw new UpdateException("Paket beklenen yapıda değil (içinde Service\\SecurityGuardService.exe yok).");
+            // Kısmi paket destekli: Service\ veya UI\'dan EN AZ BİRİ (içinde dosyayla) olsun. Değişmeyen dosyalar
+            // olduğu gibi kalır (kopyalama üzerine yazar, silmez). Not: yeni sürümde silinen dosya varsa tam klasör gerekir.
+            bool hasService = HasFiles(stagedService);
+            bool hasUi = HasFiles(stagedUi);
+            if (!hasService && !hasUi)
+                throw new UpdateException("Paket beklenen yapıda değil: içinde Service\\ veya UI\\ klasörü (ve dosyaları) olmalı.");
+            Log("Paket içeriği: " + (hasService ? "Service " : "") + (hasUi ? "UI" : "") + " güncellenecek.");
 
             Log("Servis durduruluyor...");
             _pipe.StopService(_password);
@@ -108,14 +113,14 @@ namespace SecurityGuardUpdater
 
             if (Directory.Exists(backup)) Directory.Delete(backup, true);
             Log("Mevcut sürüm yedekleniyor...");
-            CopyDir(ServiceDir, Path.Combine(backup, "Service"));
+            if (Directory.Exists(ServiceDir)) CopyDir(ServiceDir, Path.Combine(backup, "Service"));
             if (Directory.Exists(UiDir)) CopyDir(UiDir, Path.Combine(backup, "UI"));
 
             try
             {
                 Log("Yeni dosyalar kopyalanıyor...");
-                CopyDir(stagedService, ServiceDir);
-                if (Directory.Exists(stagedUi)) CopyDir(stagedUi, UiDir);
+                if (hasService) CopyDir(stagedService, ServiceDir);
+                if (hasUi) CopyDir(stagedUi, UiDir);
             }
             catch (Exception ex)
             {
@@ -155,11 +160,20 @@ namespace SecurityGuardUpdater
             http.Method = "GET";
             http.Timeout = 30000;
             http.UserAgent = "SecurityGuardUpdater/" + (version ?? "");
-            using (var resp = (HttpWebResponse)http.GetResponse())
+            try
             {
-                if (resp.StatusCode == HttpStatusCode.NoContent) return null;
-                using (var sr = new StreamReader(resp.GetResponseStream(), Encoding.UTF8))
-                    return PipeProtocol.FromJson<UpdateManifest>(sr.ReadToEnd());
+                using (var resp = (HttpWebResponse)http.GetResponse())
+                {
+                    if (resp.StatusCode == HttpStatusCode.NoContent) return null;
+                    using (var sr = new StreamReader(resp.GetResponseStream(), Encoding.UTF8))
+                        return PipeProtocol.FromJson<UpdateManifest>(sr.ReadToEnd());
+                }
+            }
+            catch (WebException ex)
+            {
+                var r = ex.Response as HttpWebResponse;
+                if (r != null) { using (r) { } throw new UpdateException("Güncelleme sunucusu hata döndü: HTTP " + (int)r.StatusCode + " " + r.StatusDescription); }
+                throw new UpdateException("İnternet bağlantısı yok ya da güncelleme sunucusuna ulaşılamıyor:\r\n" + url + "\r\n(" + ex.Message + ")");
             }
         }
 
@@ -170,20 +184,29 @@ namespace SecurityGuardUpdater
             http.Method = "GET";
             http.Timeout = 30000;
             http.ReadWriteTimeout = 600000;
-            using (var resp = (HttpWebResponse)http.GetResponse())
-            using (var rs = resp.GetResponseStream())
-            using (var fs = File.Create(file))
+            try
             {
-                long total = resp.ContentLength > 0 ? resp.ContentLength : expectedSize;
-                var buf = new byte[81920];
-                long done = 0;
-                int n;
-                while ((n = rs.Read(buf, 0, buf.Length)) > 0)
+                using (var resp = (HttpWebResponse)http.GetResponse())
+                using (var rs = resp.GetResponseStream())
+                using (var fs = File.Create(file))
                 {
-                    fs.Write(buf, 0, n);
-                    done += n;
-                    if (total > 0) Percent((int)Math.Min(100, done * 100 / total));
+                    long total = resp.ContentLength > 0 ? resp.ContentLength : expectedSize;
+                    var buf = new byte[81920];
+                    long done = 0;
+                    int n;
+                    while ((n = rs.Read(buf, 0, buf.Length)) > 0)
+                    {
+                        fs.Write(buf, 0, n);
+                        done += n;
+                        if (total > 0) Percent((int)Math.Min(100, done * 100 / total));
+                    }
                 }
+            }
+            catch (WebException ex)
+            {
+                var r = ex.Response as HttpWebResponse;
+                if (r != null) { using (r) { } throw new UpdateException("Paket indirilemedi: HTTP " + (int)r.StatusCode + " " + r.StatusDescription); }
+                throw new UpdateException("Paket indirilemedi — internet/sunucu erişimi yok:\r\n" + url + "\r\n(" + ex.Message + ")");
             }
         }
 
@@ -274,6 +297,12 @@ namespace SecurityGuardUpdater
         }
 
         // ---------------------------------------------------------------- Dosya
+
+        private static bool HasFiles(string dir)
+        {
+            try { return Directory.Exists(dir) && Directory.GetFiles(dir, "*", SearchOption.AllDirectories).Length > 0; }
+            catch { return false; }
+        }
 
         private static void CopyDir(string src, string dst)
         {
