@@ -141,7 +141,11 @@ if (adminKeys.Count > 0 && !adminAccess.RequireHttps)
     app.Logger.LogWarning("Admin:RequireHttps kapalı: yönetici anahtarı (X-Admin-Key) HTTP ile düz metin gidebilir. HTTPS kurup Admin:RequireHttps=true yapın.");
 
 app.UseForwardedHeaders(); // barındırıcı proxy'si arkasında şema + istemci IP düzeltmesi (admin uçları için şart)
-app.UseDefaultFiles();
+// Kök adres (/) doğrudan paneli açsın
+var defaultFiles = new DefaultFilesOptions();
+defaultFiles.DefaultFileNames.Clear();
+defaultFiles.DefaultFileNames.Add("panel.html");
+app.UseDefaultFiles(defaultFiles);
 app.UseStaticFiles(); // wwwroot/panel.html → merkezi web paneli (admin anahtarıyla)
 app.UseRateLimiter();
 if (swagger)
