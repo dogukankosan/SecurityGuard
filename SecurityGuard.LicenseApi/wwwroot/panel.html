@@ -352,14 +352,31 @@ function renderTable(sec){
   const bar=`<div style="display:flex;gap:8px;align-items:center;margin-bottom:9px">${chips}<button class="ghost" onclick='exportSection(${JSON.stringify(sec.Key)})'>📊 Excel'e aktar</button></div>`;
   if(!rows.length)return note+bar+'<div class="msg">Kayıt yok. 🎉</div>';
   let h=note+bar+'<div class="tablewrap"><div class="scroll"><table><thead><tr>'+sec.Columns.map(c=>`<th>${esc(c)}</th>`).join('')+'</tr></thead><tbody>';
-  for(const row of rows)h+='<tr>'+row.map(c=>`<td class="${sevClass(c)}">${esc(c)}</td>`).join('')+'</tr>';
+  for(const row of rows)h+='<tr>'+row.map((c,i)=>`<td class="${cellClass(sec.Key,sec.Columns[i],c)}">${esc(c)}</td>`).join('')+'</tr>';
   return h+'</tbody></table></div></div>';
 }
-function sevClass(v){v=(v==null?'':v).toString();
-  if(v==='Kritik'||v==='Hatalı'||v==='durmuş')return'crit';
-  if(v==='Uyarı'||v==='evet')return'warn';
-  if(v==='Bilgi'||v==='çalışıyor'||v==='Tamamlandı'||v==='Geçti')return'ok';
-  return'';}
+/* sütun + sekme bazlı renklendirme ("açık" port'ta tehlike=kırmızı, başka yerde aktif=yeşil) */
+function cellClass(secKey,col,v){
+  v=(v==null?'':v).toString().trim();
+  // ortak önem kelimeleri (Olaylar Önem; Güvenlik/Performans Durum)
+  if(v==='Kritik')return'crit'; if(v==='Uyarı')return'warn'; if(v==='Bilgi'||v==='Geçti')return'ok';
+  if(secKey==='ports'){
+    if(col==='Açıklık'){ if(v==='Herkese açık')return'crit'; if(v==='Kapalı')return'mut'; if(v)return'ok'; }
+    if(col==='Risk'){ if(v==='Yüksek')return'crit'; if(v==='Orta')return'warn'; if(v==='Düşük')return'ok'; }
+    if(col==='24s hatalı giriş'){ const n=parseInt(v,10); if(n>0)return'crit'; }
+  }
+  if(secKey==='backup' && col==='Durum'){ if(v==='Tamamlandı')return'ok'; if(v==='Hatalı')return'crit'; if(v==='Sürüyor')return'blue'; if(v)return'warn'; }
+  if(secKey==='sql'){
+    if(col==='İzleme'){ if(v==='açık')return'ok'; if(v==='kapalı')return'mut'; }
+    if(col==='Audit'){ if(v==='çalışıyor')return'ok'; if(v==='durmuş')return'crit'; }
+    if(col==='Servis'){ if(v==='Çalışıyor')return'ok'; if(v)return'crit'; }
+  }
+  if(secKey==='services'){
+    if(col==='Durum'){ if(v==='Çalışıyor')return'ok'; if(v)return'crit'; }
+    if((col==='İzleniyor'||col==='Oto-başlat') && v==='evet')return'ok';
+  }
+  return'';
+}
 function chip(t,c){return t?`<span class="chip ${c?'c-'+c:''}">${esc(t)}</span>`:''}
 function kv(k,v){if(v==null||v==='')v='-';return`<div class="k">${k}</div><div>${esc(v)}</div>`}
 function closeModal(){$('#ov').classList.remove('open');}
@@ -394,7 +411,7 @@ function showRdp(){
   else{
     h+='<div class="tablewrap"><div class="scroll"><table><thead><tr><th>Başlangıç</th><th>Bitiş</th><th>Kullanıcı</th><th>IP</th><th>Ülke</th><th>Durum</th><th>Süre</th><th>Mesai dışı</th></tr></thead><tbody>';
     for(const r of rows){const on=r.State==='Açık'||r.State==='Bağlantı kopuk';
-      h+=`<tr><td style="color:${r.OffHours?'var(--orange)':(on?'var(--green)':'')}">${fmtDT(r.Start)}</td><td>${r.End?fmtDT(r.End):'<span class="mut">—</span>'}</td><td>${esc(r.User)}</td><td>${esc(r.Ip)}</td><td>${esc(r.Country)}</td><td>${esc(r.State)}</td><td>${fmtDur(r.DurationSeconds)}${on?' <span class="mut">(sürüyor)</span>':''}</td><td class="${r.OffHours?'warn':''}">${r.OffHours?'Evet':''}</td></tr>`;}
+      h+=`<tr><td style="color:${r.OffHours?'var(--orange)':(on?'var(--green)':'')}">${fmtDT(r.Start)}</td><td>${r.End?fmtDT(r.End):'<span class="mut">—</span>'}</td><td>${esc(r.User)}</td><td>${esc(r.Ip)}</td><td>${esc(r.Country)}</td><td class="${on?'ok':''}" style="font-weight:${on?'600':'400'}">${esc(r.State)}</td><td>${fmtDur(r.DurationSeconds)}${on?' <span class="mut">(sürüyor)</span>':''}</td><td class="${r.OffHours?'warn':''}">${r.OffHours?'Evet':''}</td></tr>`;}
     h+='</tbody></table></div></div>';
   }
   $('#tabc').innerHTML=h;
