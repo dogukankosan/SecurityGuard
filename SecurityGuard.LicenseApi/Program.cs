@@ -141,6 +141,21 @@ if (adminKeys.Count > 0 && !adminAccess.RequireHttps)
     app.Logger.LogWarning("Admin:RequireHttps kapalı: yönetici anahtarı (X-Admin-Key) HTTP ile düz metin gidebilir. HTTPS kurup Admin:RequireHttps=true yapın.");
 
 app.UseForwardedHeaders(); // barındırıcı proxy'si arkasında şema + istemci IP düzeltmesi (admin uçları için şart)
+
+// Özel 404/500 sayfaları (in-process ASP.NET Core'da IIS httpErrors uygulamanın cevabını değiştirmez;
+// bu yüzden uygulama içinde servis edilir). API isteklerine HTML DÖNÜLMEZ: ajanlar JSON bekler.
+app.UseStatusCodePages(async context =>
+{
+    var http = context.HttpContext;
+    if (http.Request.Path.StartsWithSegments("/api")) return;
+    int code = http.Response.StatusCode;
+    if (code != 404 && code != 500) return;
+    string file = Path.Combine(AppContext.BaseDirectory, "ErrorPages", code + ".html");
+    if (!File.Exists(file)) return;
+    http.Response.ContentType = "text/html; charset=utf-8";
+    await http.Response.WriteAsync(await File.ReadAllTextAsync(file));
+});
+
 // Kök adres (/) doğrudan paneli açsın
 var defaultFiles = new DefaultFilesOptions();
 defaultFiles.DefaultFileNames.Clear();
