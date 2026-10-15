@@ -12,7 +12,10 @@ namespace SecurityGuardService.Ipc.Handlers
             router.Register(Commands.LicenseGet, true, true, r => Task.FromResult(WithUpdate(r, r.Guard.License.Info())));
 
             router.Register(Commands.LicenseCheck, true, true, async r =>
-                WithUpdate(r, await r.Guard.License.CheckAsync("elle (" + r.Session.UserName + ")").ConfigureAwait(false)));
+            {
+                r.Guard.Update?.CheckNow();   // lisans kontrolüyle birlikte güncellemeyi de hemen kontrol et (arka planda)
+                return WithUpdate(r, await r.Guard.License.CheckAsync("elle (" + r.Session.UserName + ")").ConfigureAwait(false));
+            });
 
             router.Register(Commands.LicenseSetApiUrl, true, true, async r =>
             {

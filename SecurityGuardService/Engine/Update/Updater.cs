@@ -27,6 +27,7 @@ namespace SecurityGuardService.Engine.Update
 
         private readonly GuardContext _g;
         private readonly CancellationTokenSource _cts = new CancellationTokenSource();
+        private readonly AutoResetEvent _wake = new AutoResetEvent(false);
         private Thread _thread;
         private readonly object _lock = new object();
         private string _available;      // yeni sürüm (null = güncel)
@@ -54,14 +55,22 @@ namespace SecurityGuardService.Engine.Update
             _thread.Start();
         }
 
+        /// <summary>Periyodu beklemeden hemen bir kontrol tetikler (ör. UI "Şimdi kontrol et").</summary>
+        public void CheckNow()
+        {
+            try { _wake.Set(); } catch { }
+        }
+
         private void Loop()
         {
             if (_cts.Token.WaitHandle.WaitOne(TimeSpan.FromSeconds(60))) return;
+            var handles = new WaitHandle[] { _cts.Token.WaitHandle, _wake };
             while (!_cts.IsCancellationRequested)
             {
                 try { Check(); }
                 catch (Exception ex) { if (_lastError != ex.Message) { AppLog.Debug(Module, "Güncelleme kontrolü başarısız: " + ex.Message); _lastError = ex.Message; } }
-                if (_cts.Token.WaitHandle.WaitOne(Interval)) return;
+                // İptal (0) → çık; uyandırma (1) ya da süre dolması → tekrar kontrol
+                if (WaitHandle.WaitAny(handles, Interval) == 0) return;
             }
         }
 
@@ -79,8 +88,9 @@ namespace SecurityGuardService.Engine.Update
                 Set(m.Version, false, m.Mandatory); return;
             }
 
+            Set(m.Version, false, m.Mandatory);   // tespit edildi → gösterge hemen "indiriliyor" olarak çıksın
             bool ok = DownloadAndVerify(m);
-            Set(m.Version, ok, m.Mandatory);
+            Set(m.Version, ok, m.Mandatory);       // indirildi + SHA doğrulandı → "hazır"
             if (ok && _lastReadyLogged != m.Version)
             {
                 AppLog.Info(Module, "Yeni sürüm indirildi ve doğrulandı: " + m.Version + " (panelden onay bekliyor; otomatik uygulanmaz).");
@@ -174,7 +184,9 @@ namespace SecurityGuardService.Engine.Update
         public void Dispose()
         {
             _cts.Cancel();
+            try { _wake.Set(); } catch { }
             if (_thread != null) _thread.Join(TimeSpan.FromSeconds(3));
+            try { _wake.Dispose(); } catch { }
         }
     }
 }

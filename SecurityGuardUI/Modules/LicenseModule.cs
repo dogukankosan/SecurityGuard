@@ -137,6 +137,10 @@ namespace SecurityGuardUI.Modules
                     bool reached = string.IsNullOrEmpty(result.LastError);
                     _checkResult.Appearance.ForeColor = !reached ? UiColors.Error : result.Active ? UiColors.Success : UiColors.Warning;
                     _checkResult.Text = DateTime.Now.ToString("HH:mm:ss") + " - " + (reached ? "Sunucuya soruldu: " + result.StatusText : "Sunucuya ulaşılamadı (ayrıntı: Son hata)");
+                    // Güncelleme kontrolü sunucuda arka planda tetiklendi; birkaç sn sonra sonucu çek (gösterge belirsin)
+                    var upTimer = new Timer { Interval = 4000 };
+                    upTimer.Tick += async (s2, e2) => { upTimer.Stop(); upTimer.Dispose(); if (Visible && Client != null) await LoadAsync(false); };
+                    upTimer.Start();
                 }
                 finally
                 {
