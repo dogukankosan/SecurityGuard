@@ -13,10 +13,30 @@ using SecurityGuard.Shared.Licensing;
 if (args.Length > 0) Console.OutputEncoding = Encoding.UTF8;
 if (args.Contains("--generate-key"))
 {
-    string keyFile = KeyFilePath(new ConfigurationBuilder().SetBasePath(AppContext.BaseDirectory).AddJsonFile("appsettings.json", true).Build());
-    var (modulus, exponent) = Signing.Generate(keyFile);
-    Console.WriteLine("İmza anahtarı oluşturuldu: " + keyFile);
+    var cfg = new ConfigurationBuilder().SetBasePath(AppContext.BaseDirectory).AddJsonFile("appsettings.json", true).AddEnvironmentVariables().Build();
+    string keyFile = KeyFilePath(cfg);
+    var (modulus, exponent) = Signing.Generate(keyFile, Passphrase(cfg));
+    Console.WriteLine("Taşınabilir imza anahtarı oluşturuldu: " + keyFile);
+    Console.WriteLine("(Parola ile korundu; başka sunucuya kopyalanabilir. Parolayı Signing:Passphrase / SG_SIGNING_PASSPHRASE ile verin.)");
     Console.WriteLine("Bu değerleri SecurityGuard.Shared\\Licensing\\LicenseProtocol.cs içine yazın:");
+    Console.WriteLine("PublicModulus = \"" + modulus + "\"");
+    Console.WriteLine("PublicExponent = \"" + exponent + "\"");
+    return;
+}
+if (args.Contains("--export-portable"))
+{
+    // ESKİ SUNUCUDA çalıştırın: var olan (DPAPI veya portable) anahtarı parola korumalı taşınabilir biçime çevirir.
+    // Özel anahtar aynı kalır → açık anahtar değişmez → ajanları yeniden dağıtmak GEREKMEZ.
+    var cfg = new ConfigurationBuilder().SetBasePath(AppContext.BaseDirectory).AddJsonFile("appsettings.json", true).AddEnvironmentVariables().Build();
+    string keyFile = KeyFilePath(cfg);
+    int i = Array.IndexOf(args, "--export-portable");
+    string outFile = (i >= 0 && i + 1 < args.Length && !args[i + 1].StartsWith("--"))
+        ? args[i + 1]
+        : keyFile + ".portable";
+    var (modulus, exponent) = Signing.ExportPortable(keyFile, outFile, Passphrase(cfg));
+    Console.WriteLine("Taşınabilir anahtar yazıldı: " + outFile);
+    Console.WriteLine("Yeni sunucuya kopyalayın (Signing:KeyFile buna işaret etsin) ve AYNI parolayı Signing:Passphrase ile verin.");
+    Console.WriteLine("Açık anahtar (değişmedi, doğrulama amaçlı):");
     Console.WriteLine("PublicModulus = \"" + modulus + "\"");
     Console.WriteLine("PublicExponent = \"" + exponent + "\"");
     return;
@@ -24,8 +44,9 @@ if (args.Contains("--generate-key"))
 if (args.Contains("--show-public-key"))
 {
     // Konsol satırları kırpılabildiği için dosyaya da yazılır
-    string keyFile = KeyFilePath(new ConfigurationBuilder().SetBasePath(AppContext.BaseDirectory).AddJsonFile("appsettings.json", true).Build());
-    using var key = new Signing(keyFile);
+    var cfg = new ConfigurationBuilder().SetBasePath(AppContext.BaseDirectory).AddJsonFile("appsettings.json", true).AddEnvironmentVariables().Build();
+    string keyFile = KeyFilePath(cfg);
+    using var key = new Signing(keyFile, Passphrase(cfg));
     string text = "PublicModulus = \"" + key.PublicModulus + "\"" + Environment.NewLine + "PublicExponent = \"" + key.PublicExponent + "\"" + Environment.NewLine;
     string outFile = Path.Combine(AppContext.BaseDirectory, "public-key.txt");
     File.WriteAllText(outFile, text);
@@ -50,7 +71,11 @@ builder.Services.AddWindowsService(o => o.ServiceName = "SecurityGuardLicenseApi
 builder.Services.ConfigureHttpJsonOptions(o => o.SerializerOptions.PropertyNamingPolicy = null);
 
 builder.Services.AddSingleton<LicenseRepository>();
-builder.Services.AddSingleton(sp => new Signing(KeyFilePath(sp.GetRequiredService<IConfiguration>())));
+builder.Services.AddSingleton(sp =>
+{
+    var cfg = sp.GetRequiredService<IConfiguration>();
+    return new Signing(KeyFilePath(cfg), Passphrase(cfg));
+});
 builder.Services.AddSingleton<AdminKey>();
 builder.Services.AddSingleton<AdminAccess>();
 builder.Services.AddSingleton<UpdateCatalog>();
@@ -260,6 +285,16 @@ static string KeyFilePath(IConfiguration config)
     string path = config["Signing:KeyFile"] is { Length: > 0 } p ? Environment.ExpandEnvironmentVariables(p)
         : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "SecurityGuardLicenseApi", "signing.key");
     return Path.IsPathRooted(path) ? path : Path.Combine(AppContext.BaseDirectory, path);
+}
+
+static string? Passphrase(IConfiguration config)
+{
+    // Öncelik: ortam değişkeni (SG_SIGNING_PASSPHRASE) → appsettings (Signing:Passphrase).
+    // Taşınabilir (portable) anahtar için gerekli; eski DPAPI anahtarında yok sayılır.
+    string? env = Environment.GetEnvironmentVariable("SG_SIGNING_PASSPHRASE");
+    if (!string.IsNullOrEmpty(env)) return env;
+    string? p = config["Signing:Passphrase"];
+    return string.IsNullOrEmpty(p) ? null : Environment.ExpandEnvironmentVariables(p);
 }
 
 static string ClientIp(HttpContext ctx) => (ctx.Connection.RemoteIpAddress ?? IPAddress.None).ToString();
