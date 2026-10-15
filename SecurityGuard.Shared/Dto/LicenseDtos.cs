@@ -36,6 +36,12 @@ namespace SecurityGuard.Shared.Dto
         public bool HardwareChanged { get; set; }
 
         public string ApiUrl { get; set; }
+
+        /// <summary>Hub'da bu makine için daha yeni sürüm (yoksa boş). Lisans sunucusu adresinden kontrol edilir — sabit adres yok.</summary>
+        public string UpdateAvailableVersion { get; set; }
+
+        /// <summary>Yeni sürüm indirildi + SHA-256 doğrulandı: güncelleme aracıyla uygulanmaya hazır.</summary>
+        public bool UpdateReady { get; set; }
     }
 
     public sealed class LicenseApiUrlRequest

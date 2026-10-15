@@ -1,5 +1,7 @@
 using System;
+using System.Diagnostics;
 using System.Drawing;
+using System.IO;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using DevExpress.XtraEditors;
@@ -25,6 +27,8 @@ namespace SecurityGuardUI.Modules
         private readonly TextEdit _hwId = new TextEdit();
         private readonly TextEdit _apiUrl = new TextEdit();
         private readonly LabelControl _checkResult = new LabelControl();
+        private readonly LabelControl _update = new LabelControl();
+        private readonly SimpleButton _updateBtn = new SimpleButton();
         private readonly Timer _refresh = new Timer { Interval = 30000 };
         private bool? _wasActive;
 
@@ -66,6 +70,23 @@ namespace SecurityGuardUI.Modules
             _lastError.Appearance.Options.UseForeColor = true;
             Wrap(_lastError).Size = new Size(760, 36);
             AddRow(panel, "Son hata", _lastError, ref y, 44);
+
+            // Güncelleme göstergesi — adres LİSANS SUNUCUSUNDAN gelir (sabit değil); yalnızca yeni sürüm varken görünür.
+            _update.Appearance.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
+            _update.Appearance.Options.UseFont = true;
+            _update.Appearance.Options.UseForeColor = true;
+            _update.Location = new Point(170, y + 4);
+            _update.AutoSizeMode = LabelAutoSizeMode.None;
+            _update.Size = new Size(300, 22);
+            _update.Visible = false;
+            panel.Controls.Add(_update);
+            _updateBtn.Text = "Güncelle";
+            _updateBtn.Location = new Point(480, y);
+            _updateBtn.Size = new Size(120, 28);
+            _updateBtn.Visible = false;
+            _updateBtn.Click += (s, e) => LaunchUpdater();
+            panel.Controls.Add(_updateBtn);
+            y += 40;
 
             y += 10;
             _hwId.Properties.ReadOnly = true;
@@ -190,9 +211,42 @@ namespace SecurityGuardUI.Modules
             _hwId.Text = info.HwId;
             if (!_apiUrl.Focused) _apiUrl.Text = info.ApiUrl;
 
+            bool hasUpdate = !string.IsNullOrEmpty(info.UpdateAvailableVersion);
+            _update.Visible = hasUpdate;
+            _updateBtn.Visible = hasUpdate;
+            if (hasUpdate)
+            {
+                _update.Text = "Güncelleme mevcut: " + info.UpdateAvailableVersion + (info.UpdateReady ? "  (indirildi, hazır)" : "  (indiriliyor…)");
+                _update.Appearance.ForeColor = UiColors.Warning;
+            }
+
             bool activated = _wasActive == false && info.Active;
             _wasActive = info.Active;
             if (activated) Host.LicenseActivated();
+        }
+
+        /// <summary>
+        /// Kurulum kökündeki Updater\SecurityGuardUpdater.exe'yi başlatır (yükseltme ister → UAC).
+        /// UI &lt;kök&gt;\UI içinde çalışır; updater &lt;kök&gt;\Updater altında. Sabit yol yazılmaz.
+        /// </summary>
+        private void LaunchUpdater()
+        {
+            try
+            {
+                string uiDir = AppDomain.CurrentDomain.BaseDirectory.TrimEnd('\\');
+                string root = Directory.GetParent(uiDir)?.FullName ?? uiDir;
+                string exe = Path.Combine(root, "Updater", "SecurityGuardUpdater.exe");
+                if (!File.Exists(exe))
+                {
+                    Ui.Warning(FindForm(), "Güncelleme aracı bulunamadı:" + Environment.NewLine + exe);
+                    return;
+                }
+                Process.Start(new ProcessStartInfo(exe) { UseShellExecute = true, WorkingDirectory = Path.GetDirectoryName(exe) });
+            }
+            catch (Exception ex)
+            {
+                Ui.Error(FindForm(), "Güncelleme aracı başlatılamadı: " + ex.Message);
+            }
         }
 
         protected override void Dispose(bool disposing)
