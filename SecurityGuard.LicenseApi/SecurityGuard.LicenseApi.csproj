@@ -19,6 +19,12 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- IIS httpErrors ile servis edilen özel hata sayfaları (yayına kopyalanır) -->
+    <Content Include="ErrorPages\404.html" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="ErrorPages\500.html" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="Dapper" Version="2.1.66" />
     <PackageReference Include="Microsoft.Data.SqlClient" Version="6.1.1" />
     <PackageReference Include="Microsoft.Extensions.Hosting.WindowsServices" Version="10.0.0" />
