@@ -18,12 +18,6 @@
     <Compile Include="..\SecurityGuard.Shared\Licensing\LicenseProtocol.cs" Link="Shared\LicenseProtocol.cs" />
   </ItemGroup>
 
-  <ItemGroup>
-    <!-- IIS httpErrors ile servis edilen özel hata sayfaları (yayına kopyalanır) -->
-    <Content Include="ErrorPages\404.html" CopyToPublishDirectory="PreserveNewest" />
-    <Content Include="ErrorPages\500.html" CopyToPublishDirectory="PreserveNewest" />
-  </ItemGroup>
-
   <!-- XML dökümantasyonu yerelde üretilsin (Swagger için) ama YAYINA kopyalanmasın (runtime gereksiz) -->
   <Target Name="RemoveXmlDocFromPublish" AfterTargets="ComputeFilesToPublish">
     <ItemGroup>

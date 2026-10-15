@@ -150,10 +150,8 @@ app.UseStatusCodePages(async context =>
     if (http.Request.Path.StartsWithSegments("/api")) return;
     int code = http.Response.StatusCode;
     if (code != 404 && code != 500) return;
-    string file = Path.Combine(AppContext.BaseDirectory, "ErrorPages", code + ".html");
-    if (!File.Exists(file)) return;
     http.Response.ContentType = "text/html; charset=utf-8";
-    await http.Response.WriteAsync(await File.ReadAllTextAsync(file));
+    await http.Response.WriteAsync(ErrorPages.Html(code));
 });
 
 // Kök adres (/) doğrudan paneli açsın
