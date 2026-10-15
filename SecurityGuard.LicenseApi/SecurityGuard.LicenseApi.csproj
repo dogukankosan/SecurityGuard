@@ -24,6 +24,14 @@
     <Content Include="ErrorPages\500.html" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 
+  <!-- XML dökümantasyonu yerelde üretilsin (Swagger için) ama YAYINA kopyalanmasın (runtime gereksiz) -->
+  <Target Name="RemoveXmlDocFromPublish" AfterTargets="ComputeFilesToPublish">
+    <ItemGroup>
+      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)"
+                             Condition="'%(Extension)' == '.xml' and '%(Filename)' == '$(AssemblyName)'" />
+    </ItemGroup>
+  </Target>
+
   <ItemGroup>
     <PackageReference Include="Dapper" Version="2.1.66" />
     <PackageReference Include="Microsoft.Data.SqlClient" Version="6.1.1" />
