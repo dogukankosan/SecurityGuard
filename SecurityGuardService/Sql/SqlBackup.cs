@@ -662,8 +662,8 @@ WHERE b.type = 'D' AND b.is_copy_only = 0 AND ISNULL(b.name, '') <> N'SecurityGu
             /// <summary>
             /// Rar.exe çalıştırır. Şifre komut satırında DEĞİL stdin'den verilir: "-hp" (değersiz) ile Rar.exe
             /// şifreyi sorar, biz stdin'den yazarız. Böylece şifre 4688 / Sysmon / EDR komut satırı kayıtlarında görünmez
-            /// ve şifre '\' ile bitse bile argüman ayrımı bozulmaz. Arşiv oluştururken bazı sürümler şifreyi iki kez
-            /// (onay) isteyebildiği için iki kez yazılır; fazlası okunmazsa zararsızdır.
+            /// ve şifre '\' ile bitse bile argüman ayrımı bozulmaz. Rar.exe, redirect edilmiş stdin'den şifreyi
+            /// EOF'a kadar TEK PARÇA okur; bu yüzden şifre TEK KEZ, "\n" ile ve BOM'suz yazılır (bkz. aşağıdaki not).
             /// </summary>
             private void RunRar(string args, TimeSpan timeout)
             {
@@ -679,9 +679,16 @@ WHERE b.type = 'D' AND b.is_copy_only = 0 AND ISNULL(b.name, '') <> N'SecurityGu
                 {
                     try
                     {
-                        p.StandardInput.WriteLine(_password);
-                        p.StandardInput.WriteLine(_password);
-                        p.StandardInput.Flush();
+                        // Rar.exe, redirect edilmiş stdin'den şifreyi EOF'a kadar TEK PARÇA okur (satır satır değil)
+                        // ve yalnızca sondaki tek newline'ı atar. Bu yüzden şifre TEK KEZ, "\n" ile ve BOM'SUZ
+                        // yazılmalı. Aksi halde şifre sessizce bozulur (servisin kendi testi aynı yolu kullandığı
+                        // için geçer ama WinRAR'da elle açılmaz):
+                        //   - İKİ kez yazılırsa RAR "parola\nparola" okur → gömülü "\n".  (asıl bulunan bug)
+                        //   - WriteLine "\r\n" yazarsa sondaki "\r" şifreye girer.
+                        //   - UTF-8 BOM yazılırsa şifrenin başına görünmez 3 bayt eklenir.
+                        byte[] pw = new UTF8Encoding(false).GetBytes(_password + "\n");
+                        p.StandardInput.BaseStream.Write(pw, 0, pw.Length);
+                        p.StandardInput.BaseStream.Flush();
                     }
                     catch (IOException)
                     {
