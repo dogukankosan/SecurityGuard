@@ -40,8 +40,8 @@ Name: "tr"; MessagesFile: "compiler:Languages\Turkish.isl"
 [Files]
 ; Servis klasörü (exe + bağımlılıklar + GeoIP + SQLite x64/x86). guard.db KOPYALANMAZ: her makinede sıfırdan oluşur.
 Source: "{#SrcRoot}\Service\*"; DestDir: "{app}\Service"; Flags: recursesubdirs ignoreversion; Excludes: "*.pdb"
-; Arayüz klasörü (DevExpress + UI + SgAutoTest)
-Source: "{#SrcRoot}\UI\*"; DestDir: "{app}\UI"; Flags: recursesubdirs ignoreversion; Excludes: "*.pdb"
+; Arayüz klasörü (DevExpress + UI). SgAutoTest (geliştirici test aracı) müşteri kurulumuna GİRMEZ.
+Source: "{#SrcRoot}\UI\*"; DestDir: "{app}\UI"; Flags: recursesubdirs ignoreversion; Excludes: "*.pdb,SgAutoTest.*"
 ; Merkezi güncelleme aracı (kök altındaki Updater klasöründe; Service/UI değiştirilirken kilitlenmez). DevExpress DLL'leriyle birlikte.
 Source: "{#SrcRoot}\Updater\*"; DestDir: "{app}\Updater"; Flags: recursesubdirs ignoreversion; Excludes: "*.pdb,*.xml"
 
