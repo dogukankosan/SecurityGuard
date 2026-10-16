@@ -1,6 +1,7 @@
 # SecurityGuard
 
 <img width="1352" height="815" alt="xx" src="https://github.com/user-attachments/assets/f43b5eec-0685-431d-9271-dfb1868cc528" />
+<img width="1915" height="845" alt="xx" src="https://github.com/user-attachments/assets/e2b761d4-32df-4085-bc9b-301775474328" />
 
 
 Windows sunucular için **güvenlik izleme ve saldırı engelleme** yazılımı. İnternete açık **RDP** ve **SQL Server** çalıştıran sunucuları dış saldırılara karşı korur, şüpheli her hareketi anında mail ile bildirir.
